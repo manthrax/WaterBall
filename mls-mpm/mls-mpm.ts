@@ -31,6 +31,7 @@ export class MLSMPMSimulator {
     numParticles = 0
     gridCount = 0
     currentSpawnMaterialType = 0
+    spawnPaused = true  // Start paused - user must hold faucet button
     gravityMode = false
     damping = 1.0  // Original had no damping
     wallFriction = 0.0  // Original had no friction
@@ -436,7 +437,7 @@ export class MLSMPMSimulator {
         const gravityStrengthValues = new Float32Array([this.gravityStrength]);
         this.device.queue.writeBuffer(this.gravityStrengthBuffer, 0, gravityStrengthValues);
 
-        if (this.frameCount % 2 == 0 && this.numParticles < targetNumParticles) { // TODO : dt に依存しないようにする
+        if (!this.spawnPaused && this.frameCount % 2 == 0 && this.numParticles < targetNumParticles) { // TODO : dt に依存しないようにする
             console.log("spawn material type:", this.currentSpawnMaterialType);
             computePass.setBindGroup(0, this.spawnParticlesBindGroup)
             computePass.setPipeline(this.spawnParticlesPipeline)
@@ -490,6 +491,16 @@ export class MLSMPMSimulator {
 
     setSpawnMaterialType(materialType: number) {
         this.currentSpawnMaterialType = materialType;
+    }
+
+    setSpawnPaused(paused: boolean) {
+        this.spawnPaused = paused;
+    }
+
+    clearParticles() {
+        this.changeNumParticles(0);
+        this.frameCount = 0;
+        this.spawned = false;
     }
 
     setGravityMode(enabled: boolean) {

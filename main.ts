@@ -182,6 +182,49 @@ async function main() {
 		}
 	});
 
+	// Faucet button - hold to spawn particles
+	let faucetButton = document.getElementById('faucet') as HTMLButtonElement;
+	faucetButton.addEventListener('mousedown', () => {
+		mlsmpmSimulator.setSpawnPaused(false);
+		faucetButton.style.background = '#2ecc71'; // Green when active
+		faucetButton.textContent = '💧 SPAWNING...';
+	});
+	faucetButton.addEventListener('mouseup', () => {
+		mlsmpmSimulator.setSpawnPaused(true);
+		faucetButton.style.background = '#4a90e2'; // Back to blue
+		faucetButton.textContent = '💧 FAUCET (Hold)';
+	});
+	faucetButton.addEventListener('mouseleave', () => {
+		mlsmpmSimulator.setSpawnPaused(true);
+		faucetButton.style.background = '#4a90e2'; // Back to blue
+		faucetButton.textContent = '💧 FAUCET (Hold)';
+	});
+	// Also handle touch events for mobile
+	faucetButton.addEventListener('touchstart', (e) => {
+		e.preventDefault();
+		mlsmpmSimulator.setSpawnPaused(false);
+		faucetButton.style.background = '#2ecc71';
+		faucetButton.textContent = '💧 SPAWNING...';
+	});
+	faucetButton.addEventListener('touchend', (e) => {
+		e.preventDefault();
+		mlsmpmSimulator.setSpawnPaused(true);
+		faucetButton.style.background = '#4a90e2';
+		faucetButton.textContent = '💧 FAUCET (Hold)';
+	});
+
+	// Clear button - reset simulation
+	let clearButton = document.getElementById('clear') as HTMLButtonElement;
+	clearButton.addEventListener('click', () => {
+		mlsmpmSimulator.clearParticles();
+		console.log("Cleared all particles");
+		// Flash the button
+		clearButton.style.background = '#c0392b';
+		setTimeout(() => {
+			clearButton.style.background = '#e74c3c';
+		}, 100);
+	});
+
 	const camera = new Camera(canvasElement);
 
 	// デバイスロストの監視
@@ -227,6 +270,8 @@ async function main() {
 		const particle = document.getElementById("particle") as HTMLInputElement
 		const rotate = document.getElementById("autorotate") as HTMLInputElement
 		const gravity = document.getElementById("gravity") as HTMLInputElement
+		const faucetButton = document.getElementById("faucet") as HTMLButtonElement
+		const clearButton = document.getElementById("clear") as HTMLButtonElement
 		const dampingSlider = document.getElementById("damping-slider") as HTMLInputElement
 		const dampingValue = document.getElementById("damping-value") as HTMLSpanElement
 		const wallFrictionSlider = document.getElementById("wall-friction-slider") as HTMLInputElement
