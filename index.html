@@ -77,11 +77,38 @@
         <label>
           <input type="checkbox" id="particle"> Particles
         </label>
+        <label>
+          <input type="checkbox" id="gravity"> Gravity mode
+        </label>
       </div>
-      <div id="slider-container">
+      <div style="margin-top: 15px;">
+        <b>Spawn Fluid Type:</b>
+        <form id="material-type-form">
+          <label><input type="radio" name="materialType" value="0" checked> Blue 🔵 (Water - thin)</label><br>
+          <label><input type="radio" name="materialType" value="1"> Red 🔴 (Light syrup)</label><br>
+          <label><input type="radio" name="materialType" value="2"> Green 🟢 (Syrup)</label><br>
+          <label><input type="radio" name="materialType" value="3"> Yellow 🟡 (Honey - thick)</label><br>
+        </form>
+      </div>
+      <div id="slider-container" style="margin-top: 15px;">
         <label for="slider">Box width:</label>
         <input type="range" id="slider" min="0" max="100" value="100" />
         <span id="slider-value"></span>
+      </div>
+      <div id="damping-slider-container" style="margin-top: 15px;">
+        <label for="damping-slider">Damping (0 = still, 100 = none):</label>
+        <input type="range" id="damping-slider" min="0" max="100" value="100" />
+        <span id="damping-value"></span>
+      </div>
+      <div id="wall-friction-slider-container" style="margin-top: 10px;">
+        <label for="wall-friction-slider">Wall friction (0 = none, 100 = max):</label>
+        <input type="range" id="wall-friction-slider" min="0" max="100" value="0" />
+        <span id="wall-friction-value"></span>
+      </div>
+      <div id="wall-restitution-slider-container" style="margin-top: 10px;">
+        <label for="wall-restitution-slider">Wall bounce (0 = stick, 100 = elastic):</label>
+        <input type="range" id="wall-restitution-slider" min="0" max="100" value="100" />
+        <span id="wall-restitution-value"></span>
       </div>
     </div>
     <div id="number-container">

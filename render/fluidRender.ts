@@ -20,6 +20,7 @@ export class FluidRenderer {
     thicknessTextureView: GPUTextureView
     tmpThicknessTextureView: GPUTextureView
     depthTestTextureView: GPUTextureView
+    materialTextureView: GPUTextureView
 
     
     depthMapBindGroup: GPUBindGroup
@@ -84,6 +85,9 @@ export class FluidRenderer {
                     {
                         format: 'r32float',
                     },
+                    {
+                        format: 'r32uint',
+                    },
                 ]
             }, 
             primitive: {
@@ -104,6 +108,9 @@ export class FluidRenderer {
                 targets: [
                     {
                         format: 'r32float',
+                    },
+                    {
+                        format: 'r32uint',
                     },
                 ],
             },
@@ -223,11 +230,18 @@ export class FluidRenderer {
             format: 'depth32float',
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
         })
+        const materialTexture = device.createTexture({
+            label: 'material type texture', 
+            size: [canvas.width, canvas.height, 1],
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+            format: 'r32uint',
+        })
         this.depthMapTextureView = depthMapTextureView
         this.tmpDepthMapTextureView = tmpDepthMapTexture.createView()
         this.thicknessTextureView = thicknessTexture.createView()
         this.tmpThicknessTextureView = tmpThicknessTexture.createView()
         this.depthTestTextureView = depthTestTexture.createView()
+        this.materialTextureView = materialTexture.createView()
 
         // buffer
         const filterXUniformsValues = new ArrayBuffer(8)
@@ -324,7 +338,8 @@ export class FluidRenderer {
               { binding: 1, resource: this.depthMapTextureView },
               { binding: 2, resource: { buffer: renderUniformBuffer } },
               { binding: 3, resource: this.thicknessTextureView },
-              { binding: 4, resource: cubemapTextureView }, 
+              { binding: 4, resource: cubemapTextureView },
+              { binding: 5, resource: this.materialTextureView },
             ],
         })
 
@@ -353,6 +368,12 @@ export class FluidRenderer {
                 {
                     view: this.depthMapTextureView,
                     clearValue: { r: 1e6, g: 0.0, b: 0.0, a: 1.0 }, // 背景は十分大きい深さの値でいいか？
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+                {
+                    view: this.materialTextureView,
+                    clearValue: { r: 0, g: 0, b: 0, a: 0 },
                     loadOp: 'clear',
                     storeOp: 'store',
                 },
@@ -444,6 +465,12 @@ export class FluidRenderer {
                 {
                     view: this.depthMapTextureView,
                     clearValue: { r: 1e6, g: 0.0, b: 0.0, a: 1.0 }, // 背景は十分大きい深さの値でいいか？
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+                {
+                    view: this.materialTextureView,
+                    clearValue: { r: 0, g: 0, b: 0, a: 0 },
                     loadOp: 'clear',
                     storeOp: 'store',
                 },

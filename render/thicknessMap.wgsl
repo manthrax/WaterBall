@@ -17,7 +17,8 @@ struct FragmentInput {
 }
 
 struct PosVel {
-    position: vec3f, 
+    position: vec3f,
+    material_type: u32,
     v: vec3f, 
     density: f32, 
 }

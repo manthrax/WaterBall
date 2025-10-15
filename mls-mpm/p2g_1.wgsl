@@ -1,6 +1,8 @@
 struct Particle {
-    position: vec3f, 
-    v: vec3f, 
+    position: vec3f,
+    material_type: u32,
+    v: vec3f,
+    _padding: u32,
     C: mat3x3f, 
 }
 struct Cell {

@@ -1,13 +1,16 @@
 struct Particle {
-    position: vec3f, 
-    v: vec3f, 
+    position: vec3f,
+    material_type: u32,
+    v: vec3f,
+    _padding: u32,
     C: mat3x3f, 
 }
 
 struct PosVel {
-    position: vec3f, 
-    v: vec3f, 
-    density: f32, 
+    position: vec3f,
+    material_type: u32,
+    v: vec3f,
+    density: f32,
 }
 
 @group(0) @binding(0) var<storage, read> particles: array<Particle>;
@@ -19,6 +22,7 @@ struct PosVel {
 fn copyPosition(@builtin(global_invocation_id) id: vec3<u32>) {
     if (id.x < numParticles) { 
         posvel[id.x].position = particles[id.x].position;
+        posvel[id.x].material_type = particles[id.x].material_type;
         posvel[id.x].v = particles[id.x].v;
         posvel[id.x].density = densities[id.x];
     }

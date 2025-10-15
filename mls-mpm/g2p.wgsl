@@ -1,6 +1,8 @@
 struct Particle {
-    position: vec3f, 
-    v: vec3f, 
+    position: vec3f,
+    material_type: u32,
+    v: vec3f,
+    _padding: u32,
     C: mat3x3f, 
 }
 struct Cell {
@@ -19,9 +21,31 @@ override dt: f32;
 @group(0) @binding(3) var<uniform> init_box_size: vec3f;
 @group(0) @binding(4) var<uniform> numParticles: u32;
 @group(0) @binding(5) var<uniform> sphereRadius: f32;
+@group(0) @binding(6) var<uniform> gravityMode: u32;
+@group(0) @binding(7) var<uniform> damping: f32;
+@group(0) @binding(8) var<uniform> wallFriction: f32;
+@group(0) @binding(9) var<uniform> wallRestitution: f32;
 
 fn decodeFixedPoint(fixed_point: i32) -> f32 {
 	return f32(fixed_point) / fixed_point_multiplier;
+}
+
+// SDF for axis-aligned box boundary
+// Returns: negative inside, positive outside, 0 on surface
+fn boxSDF(p: vec3f, boxMin: vec3f, boxMax: vec3f) -> f32 {
+    let center = (boxMin + boxMax) * 0.5;
+    let halfSize = (boxMax - boxMin) * 0.5;
+    let q = abs(p - center) - halfSize;
+    return length(max(q, vec3f(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+// Calculate gradient of SDF (surface normal)
+fn boxSDFGradient(p: vec3f, boxMin: vec3f, boxMax: vec3f) -> vec3f {
+    let epsilon = 0.01;
+    let dx = boxSDF(p + vec3f(epsilon, 0.0, 0.0), boxMin, boxMax) - boxSDF(p - vec3f(epsilon, 0.0, 0.0), boxMin, boxMax);
+    let dy = boxSDF(p + vec3f(0.0, epsilon, 0.0), boxMin, boxMax) - boxSDF(p - vec3f(0.0, epsilon, 0.0), boxMin, boxMax);
+    let dz = boxSDF(p + vec3f(0.0, 0.0, epsilon), boxMin, boxMax) - boxSDF(p - vec3f(0.0, 0.0, epsilon), boxMin, boxMax);
+    return normalize(vec3f(dx, dy, dz));
 }
 
 
@@ -73,38 +97,57 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
 
         particles[id.x].C = B * 4.0f;
         particles[id.x].position += particles[id.x].v * dt;
-        particles[id.x].position = vec3f(
-            clamp(particles[id.x].position.x, 1., real_box_size.x - 2.), 
-            clamp(particles[id.x].position.y, 1., real_box_size.y - 2.), 
-            clamp(particles[id.x].position.z, 1., real_box_size.z - 2.)
-        );
-
-        let center = vec3f(real_box_size.x / 2, real_box_size.y / 2, real_box_size.z / 2);
-        let dist = center - particles[id.x].position;
-        let dirToOrigin = normalize(dist);
-        var rForce = vec3f(0);
-
-        // let r: f32 = 18.; // 40,000
-        let r: f32 = sphereRadius; // 60,000
-        // let r: f32 = 26.; // 100,000
-
-        if (dot(dist, dist) < r * r) {
-            particles[id.x].v += -(r - sqrt(dot(dist, dist))) * dirToOrigin * 3.0;
+        
+        // SDF-based boundary constraint
+        let wall_margin = 3.0;
+        let wall_min = vec3f(wall_margin);
+        let wall_max = real_box_size - wall_margin;
+        
+        let sdf_distance = boxSDF(particles[id.x].position, wall_min, wall_max);
+        
+        if (sdf_distance > 0.0) {
+            // Particle is outside boundary - project back to surface
+            let normal = boxSDFGradient(particles[id.x].position, wall_min, wall_max);
+            
+            // Hard constraint: move particle back inside
+            particles[id.x].position -= normal * sdf_distance;
+            
+            // Decompose velocity into normal and tangential components
+            let v_dot_n = dot(particles[id.x].v, normal);
+            let v_normal = normal * v_dot_n;
+            let v_tangent = particles[id.x].v - v_normal;
+            
+            // Apply restitution to normal component (bounce)
+            let v_normal_new = v_normal * -wallRestitution;
+            
+            // Apply friction to tangential component (slide)
+            let v_tangent_new = v_tangent * (1.0 - wallFriction);
+            
+            // Reconstruct velocity
+            particles[id.x].v = v_normal_new + v_tangent_new;
         }
 
-        particles[id.x].v += dirToOrigin * 0.1;
-
+        // Apply forces based on mode
+        if (gravityMode == 1u) {
+            // Gravity mode: simple downward force
+            let gravity = vec3f(0.0, -0.5, 0.0);
+            particles[id.x].v += gravity * dt;
+        } else {
+            // Ball spin mode: radial forces to center
+            let center = vec3f(real_box_size.x / 2, real_box_size.y / 2, real_box_size.z / 2);
+            let dist = center - particles[id.x].position;
+            let dirToOrigin = normalize(dist);
+            
+            let r: f32 = sphereRadius;
+            
+            if (dot(dist, dist) < r * r) {
+                particles[id.x].v += -(r - sqrt(dot(dist, dist))) * dirToOrigin * 3.0;
+            }
+            
+            particles[id.x].v += dirToOrigin * 0.1;
+        }
         
-        let k = 3.0;
-        let wall_stiffness = 1.0;
-        let x_n: vec3f = particles[id.x].position + particles[id.x].v * dt * k;
-        let wall_min: vec3f = vec3f(3.);
-        let wall_max: vec3f = real_box_size - 4.;
-        if (x_n.x < wall_min.x) { particles[id.x].v.x += wall_stiffness * (wall_min.x - x_n.x); }
-        if (x_n.x > wall_max.x) { particles[id.x].v.x += wall_stiffness * (wall_max.x - x_n.x); }
-        if (x_n.y < wall_min.y) { particles[id.x].v.y += wall_stiffness * (wall_min.y - x_n.y); }
-        if (x_n.y > wall_max.y) { particles[id.x].v.y += wall_stiffness * (wall_max.y - x_n.y); }
-        if (x_n.z < wall_min.z) { particles[id.x].v.z += wall_stiffness * (wall_min.z - x_n.z); }
-        if (x_n.z > wall_max.z) { particles[id.x].v.z += wall_stiffness * (wall_max.z - x_n.z); }
+        // Apply damping to gradually reduce velocity (energy dissipation)
+        particles[id.x].v *= damping;
     }
 }

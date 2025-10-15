@@ -1,6 +1,8 @@
 struct Particle {
-    position: vec3f, 
-    v: vec3f, 
+    position: vec3f,
+    material_type: u32,
+    v: vec3f,
+    _padding: u32,
     C: mat3x3f, 
 }
 struct Cell {
@@ -15,6 +17,25 @@ override stiffness: f32;
 override rest_density: f32;
 override dynamic_viscosity: f32;
 override dt: f32;
+
+// Material types
+const MATERIAL_TYPE_0: u32 = 0u;
+const MATERIAL_TYPE_1: u32 = 1u;
+const MATERIAL_TYPE_2: u32 = 2u;
+const MATERIAL_TYPE_3: u32 = 3u;
+
+fn getMaterialViscosity(material_type: u32) -> f32 {
+    // Different viscosities per material type
+    if (material_type == MATERIAL_TYPE_0) {
+        return 0.1; // Blue - Water (low viscosity)
+    } else if (material_type == MATERIAL_TYPE_1) {
+        return 0.15; // Red - Light syrup
+    } else if (material_type == MATERIAL_TYPE_2) {
+        return 0.25; // Green - Syrup
+    } else {
+        return 0.4; // Yellow - Honey (high viscosity)
+    }
+}
 
 fn encodeFixedPoint(floating_point: f32) -> i32 {
 	return i32(floating_point * fixed_point_multiplier);
@@ -68,7 +89,8 @@ fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
         var stress: mat3x3f = mat3x3f(-pressure, 0, 0, 0, -pressure, 0, 0, 0, -pressure);
         let dudv: mat3x3f = particle.C;
         let strain: mat3x3f = dudv + transpose(dudv);
-        stress += dynamic_viscosity * strain;
+        let material_viscosity = getMaterialViscosity(particle.material_type);
+        stress += material_viscosity * strain;
 
         let eq_16_term0 = -volume * 4 * stress * dt;
 

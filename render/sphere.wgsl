@@ -2,18 +2,21 @@ struct VertexOutput {
     @builtin(position) position: vec4f, 
     @location(0) uv: vec2f, 
     @location(1) view_position: vec3f, 
-    @location(2) speed: f32, 
+    @location(2) speed: f32,
+    @location(3) @interpolate(flat) material_type: u32,
 }
 
 struct FragmentInput {
     @location(0) uv: vec2f, 
     @location(1) view_position: vec3f, 
-    @location(2) speed: f32, 
+    @location(2) speed: f32,
+    @location(3) @interpolate(flat) material_type: u32,
 }
 
 struct FragmentOutput {
     @location(0) color: vec4f, 
-    @location(1) depth: vec4f, 
+    @location(1) depth: vec4f,
+    @location(2) material: vec4u,
     @builtin(frag_depth) frag_depth: f32, 
 }
 
@@ -27,7 +30,8 @@ struct RenderUniforms {
 }
 
 struct PosVel {
-    position: vec3f, 
+    position: vec3f,
+    material_type: u32,
     v: vec3f, 
     density: f32, 
 }
@@ -91,8 +95,8 @@ fn vs(
 
     let out_position = uniforms.projection_matrix * vec4f(view_position + corner, 1.0);
 
-
-    return VertexOutput(out_position, uv, view_position, speed);
+    let material_type = particles[instance_index].material_type;
+    return VertexOutput(out_position, uv, view_position, speed, material_type);
 }
 
 fn value_to_color(value: f32) -> vec3<f32> {
@@ -138,9 +142,21 @@ fn fs(input: FragmentInput) -> FragmentOutput {
     out.frag_depth = clip_space_pos.z / clip_space_pos.w;
 
     var diffuse: f32 = max(0.0, dot(normal, normalize(vec3(1.0, 1.0, 1.0))));
-    var color: vec3f = value_to_color(input.speed / 2);
+    
+    // Color by material type (4 types)
+    var baseColor: vec3f;
+    if (input.material_type == 1u) {
+        baseColor = vec3f(0.95, 0.2, 0.1); // Red
+    } else if (input.material_type == 2u) {
+        baseColor = vec3f(0.2, 0.95, 0.3); // Green
+    } else if (input.material_type == 3u) {
+        baseColor = vec3f(0.95, 0.85, 0.1); // Yellow
+    } else {
+        baseColor = vec3f(0.0, 0.7375, 0.95); // Blue
+    }
 
-    out.color = vec4(diffuse * color, 1.);
+    out.color = vec4(diffuse * baseColor, 1.);
     out.depth = vec4(real_view_pos.z, 0., 0., 1.);
+    out.material = vec4u(input.material_type, 0u, 0u, 1u);
     return out;
 }

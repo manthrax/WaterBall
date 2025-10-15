@@ -65,7 +65,7 @@ async function main() {
 			numberButtonPressed = true
 			numberButtonPressedButton = target.value
 		}
-	}); 
+	});
 	const smallValue = document.getElementById("small-value") as HTMLSpanElement;
 	const mediumValue = document.getElementById("medium-value") as HTMLSpanElement;
 	const largeValue = document.getElementById("large-value") as HTMLSpanElement;
@@ -171,6 +171,17 @@ async function main() {
 
 	console.log("simulator initialization done")
 
+	// Material type selection - must be after mlsmpmSimulator is created
+	let materialTypeForm = document.getElementById('material-type-form') as HTMLFormElement;
+	materialTypeForm.addEventListener('change', function(event) {
+		const target = event.target as HTMLInputElement
+		if (target?.name === 'materialType') {
+			const materialType = parseInt(target.value);
+			mlsmpmSimulator.setSpawnMaterialType(materialType);
+			console.log("Changed spawn material type to:", materialType);
+		}
+	});
+
 	const camera = new Camera(canvasElement);
 
 	// デバイスロストの監視
@@ -215,8 +226,36 @@ async function main() {
 		const slider = document.getElementById("slider") as HTMLInputElement
 		const particle = document.getElementById("particle") as HTMLInputElement
 		const rotate = document.getElementById("autorotate") as HTMLInputElement
+		const gravity = document.getElementById("gravity") as HTMLInputElement
+		const dampingSlider = document.getElementById("damping-slider") as HTMLInputElement
+		const dampingValue = document.getElementById("damping-value") as HTMLSpanElement
+		const wallFrictionSlider = document.getElementById("wall-friction-slider") as HTMLInputElement
+		const wallFrictionValue = document.getElementById("wall-friction-value") as HTMLSpanElement
+		const wallRestitutionSlider = document.getElementById("wall-restitution-slider") as HTMLInputElement
+		const wallRestitutionValue = document.getElementById("wall-restitution-value") as HTMLSpanElement
+		
 		sphereRenderFl = particle.checked
 		rotateFl = rotate.checked
+		mlsmpmSimulator.setGravityMode(gravity.checked)
+		
+		// Damping: 0-100 slider maps to 0.95-1.0 (0 = max damping, 100 = no damping)
+		const dampingPercent = parseInt(dampingSlider.value)
+		const dampingFactor = 0.95 + (dampingPercent / 100) * 0.05
+		mlsmpmSimulator.setDamping(dampingFactor)
+		dampingValue.textContent = dampingPercent.toString()
+		
+		// Wall friction: 0-100 slider maps to 0.0-0.5 (0 = no friction, 100 = high friction)
+		const wallFrictionPercent = parseInt(wallFrictionSlider.value)
+		const wallFrictionFactor = (wallFrictionPercent / 100) * 0.5
+		mlsmpmSimulator.setWallFriction(wallFrictionFactor)
+		wallFrictionValue.textContent = wallFrictionPercent.toString()
+		
+		// Wall restitution: 0-100 slider maps to 0.5-1.0 (0 = inelastic/stick, 100 = elastic/bounce)
+		const wallRestitutionPercent = parseInt(wallRestitutionSlider.value)
+		const wallRestitutionFactor = 0.5 + (wallRestitutionPercent / 100) * 0.5
+		mlsmpmSimulator.setWallRestitution(wallRestitutionFactor)
+		wallRestitutionValue.textContent = wallRestitutionPercent.toString()
+		
 		let curBoxWidthRatio = parseInt(slider.value) / 200 + 0.5
 		const minClosingSpeed = -0.01
 		const maxOpeningSpeed = 0.04
