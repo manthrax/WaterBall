@@ -172,14 +172,11 @@ async function main() {
 	console.log("simulator initialization done")
 
 	// Material type selection - must be after mlsmpmSimulator is created
-	let materialTypeForm = document.getElementById('material-type-form') as HTMLFormElement;
-	materialTypeForm.addEventListener('change', function(event) {
-		const target = event.target as HTMLInputElement
-		if (target?.name === 'materialType') {
-			const materialType = parseInt(target.value);
-			mlsmpmSimulator.setSpawnMaterialType(materialType);
-			console.log("Changed spawn material type to:", materialType);
-		}
+	let materialSelect = document.getElementById('material-select') as HTMLSelectElement;
+	materialSelect.addEventListener('change', function() {
+		const materialType = parseInt(materialSelect.value);
+		mlsmpmSimulator.setSpawnMaterialType(materialType);
+		console.log("Changed spawn material type to:", materialType);
 	});
 
 	// Faucet button - hold to spawn particles
@@ -324,9 +321,14 @@ async function main() {
 		dVal = Math.min(dVal, maxOpeningSpeed);
 		boxWidthRatio += dVal
 
-		// 行列の更新
+		// Update box size
 		realBoxSize[2] = initBoxSize[2] * boxWidthRatio
 		mlsmpmSimulator.changeBoxSize(realBoxSize)
+		
+		// Update camera target to keep box centered in view
+		camera.target = [realBoxSize[0] / 2, realBoxSize[1] / 2, realBoxSize[2] / 2];
+		camera.recalculateView();
+		
 		device.queue.writeBuffer(renderUniformBuffer, 0, renderUniformsValues) 
 
 		const commandEncoder = device.createCommandEncoder()
