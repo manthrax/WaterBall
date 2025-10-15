@@ -164,18 +164,30 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
             // Reconstruct velocity
             particles[id.x].v = v_normal_new + v_tangent_new;
             
-            // CRITICAL FIX: Reset deformation gradient for elastoplastic materials at wall collision
+            // CRITICAL FIX: Reset deformation gradient for solid materials at wall collision
             // This prevents stored elastic energy from causing bouncing instability
             let material_type_local = particles[id.x].material_type;
-            if (material_type_local >= 4u && material_type_local <= 7u) {
-                // Reset F to identity - release all stored elastic deformation
-                particles[id.x].F = mat3x3f(
-                    vec3f(1., 0., 0.),
-                    vec3f(0., 1., 0.),
-                    vec3f(0., 0., 1.)
-                );
-                // Extra velocity damping at wall collision for elastoplastic materials
-                particles[id.x].v *= 0.8;  // Remove 20% of kinetic energy
+            if (material_type_local >= 4u && material_type_local <= 9u) {
+                // For granular materials (4-7): reset F completely
+                // For elastic solids (8-9): partial reset to allow some bounce
+                if (material_type_local >= 8u) {
+                    // Jello/Rock: keep some elastic deformation for bounce
+                    let I = mat3x3f(
+                        vec3f(1., 0., 0.),
+                        vec3f(0., 1., 0.),
+                        vec3f(0., 0., 1.)
+                    );
+                    particles[id.x].F = particles[id.x].F * 0.5 + I * 0.5;  // 50% reset
+                    particles[id.x].v *= 0.9;  // Less damping for elastic bounce
+                } else {
+                    // Granular materials: full reset
+                    particles[id.x].F = mat3x3f(
+                        vec3f(1., 0., 0.),
+                        vec3f(0., 1., 0.),
+                        vec3f(0., 0., 1.)
+                    );
+                    particles[id.x].v *= 0.8;  // More damping for granular
+                }
             }
         }
 
@@ -204,9 +216,9 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
         // Apply damping to gradually reduce velocity (energy dissipation)
         particles[id.x].v *= damping;
         
-        // Extra damping and deformation relaxation for elastoplastic materials (types 4-7)
+        // Extra damping and deformation relaxation for solid materials (types 4-9)
         let material_type = particles[id.x].material_type;
-        if (material_type >= 4u && material_type <= 7u) {
+        if (material_type >= 4u && material_type <= 9u) {
             particles[id.x].v *= 0.99;  // Additional 1% damping for solids
             
             // Gradually relax deformation gradient back toward identity (plastic flow)
@@ -216,7 +228,15 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
                 vec3f(0., 1., 0.),
                 vec3f(0., 0., 1.)
             );
-            particles[id.x].F = particles[id.x].F * 0.98 + I * 0.02;  // Relax 2% per frame
+            
+            // Different relaxation rates for different materials
+            var relaxation = 0.02;  // Default 2% relaxation per frame
+            if (material_type == 8u || material_type == 9u) {
+                // Jello and Rock are more elastic - slower relaxation
+                relaxation = 0.005;  // 0.5% relaxation - keeps elastic energy longer
+            }
+            
+            particles[id.x].F = particles[id.x].F * (1.0 - relaxation) + I * relaxation;
         }
     }
 }

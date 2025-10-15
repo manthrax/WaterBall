@@ -159,6 +159,10 @@ fn fs(input: FragmentInput) -> FragmentOutput {
         baseColor = vec3f(0.95, 0.95, 1.0); // White - Snow
     } else if (input.material_type == 7u) {
         baseColor = vec3f(0.55, 0.45, 0.35); // Brown - Clay
+    } else if (input.material_type == 8u) {
+        baseColor = vec3f(0.85, 0.1, 0.85); // Magenta - Jello
+    } else if (input.material_type == 9u) {
+        baseColor = vec3f(0.4, 0.4, 0.45); // Dark gray - Rock
     } else {
         baseColor = vec3f(0.0, 0.7375, 0.95); // Blue - Water
     }

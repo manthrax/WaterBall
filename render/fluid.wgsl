@@ -87,6 +87,10 @@ fn fs(input: FragmentInput) -> @location(0) vec4f {
         diffuseColor = vec3f(0.95, 0.95, 1.0); // White - Snow (material 6)
     } else if (material_type == 7u) {
         diffuseColor = vec3f(0.55, 0.45, 0.35); // Brown - Clay (material 7)
+    } else if (material_type == 8u) {
+        diffuseColor = vec3f(0.85, 0.1, 0.85); // Magenta - Jello (material 8)
+    } else if (material_type == 9u) {
+        diffuseColor = vec3f(0.4, 0.4, 0.45); // Dark gray - Rock (material 9)
     }
     var transmittance: vec3f = exp(-density * thickness * (1.0 - diffuseColor)); 
     var refractionColor: vec3f = bgColor * transmittance;

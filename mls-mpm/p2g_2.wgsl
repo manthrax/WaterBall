@@ -28,6 +28,8 @@ const MATERIAL_TYPE_4: u32 = 4u;  // Sand (elastoplastic)
 const MATERIAL_TYPE_5: u32 = 5u;  // Wet sand (elastoplastic)
 const MATERIAL_TYPE_6: u32 = 6u;  // Snow (elastoplastic)
 const MATERIAL_TYPE_7: u32 = 7u;  // Clay (elastoplastic)
+const MATERIAL_TYPE_8: u32 = 8u;  // Jello (elastic solid)
+const MATERIAL_TYPE_9: u32 = 9u;  // Rock (rigid solid)
 
 struct MaterialProperties {
     // Elastic properties
@@ -104,14 +106,30 @@ fn getMaterialProperties(material_type: u32) -> MaterialProperties {
         props.poissons_ratio = 0.15;
         props.cohesion = 10.0;             // Increased for snowball effect
         props.friction_angle = 0.7;        // tan(~35°)
-    } else {
-        // Clay (elastoplastic) - TYPE_7 - HIGH cohesion, moldable
+    } else if (material_type == MATERIAL_TYPE_7) {
+        // Clay (elastoplastic) - HIGH cohesion, moldable
         props.is_fluid = false;
         props.viscosity = 0.0;
         props.youngs_modulus = 200.0;      // Moderate stiffness
         props.poissons_ratio = 0.3;
         props.cohesion = 40.0;             // High cohesion - holds shape well
         props.friction_angle = 0.4;        // tan(~22°)
+    } else if (material_type == MATERIAL_TYPE_8) {
+        // Jello (elastic solid) - bouncy, holds shape, nearly incompressible
+        props.is_fluid = false;
+        props.viscosity = 0.0;
+        props.youngs_modulus = 800.0;      // High stiffness - very elastic
+        props.poissons_ratio = 0.48;       // Nearly incompressible (like rubber)
+        props.cohesion = 100.0;            // Very high cohesion - stays together
+        props.friction_angle = 0.1;        // Low internal friction - slides easily
+    } else {
+        // Rock (rigid solid) - TYPE_9 - very stiff, brittle
+        props.is_fluid = false;
+        props.viscosity = 0.0;
+        props.youngs_modulus = 2000.0;     // Very high stiffness
+        props.poissons_ratio = 0.25;       // Typical for rock
+        props.cohesion = 200.0;            // Extremely high cohesion
+        props.friction_angle = 0.8;        // High internal friction
     }
     
     return props;
@@ -302,7 +320,11 @@ fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
             }
         }
 
-        let volume: f32 = 1.0 / density; // particle.mass = 1.0;
+        // CRITICAL FIX: Clamp density to prevent division by near-zero
+        // This prevents energy explosions in sparse regions
+        let clamped_density = max(density, rest_density * 0.5);  // Never less than 50% rest density
+        let volume: f32 = 1.0 / clamped_density; // particle.mass = 1.0;
+        let safe_volume = min(volume, 5.0);  // Cap maximum volume
         densities[id.x] = density;
 
         // Get material properties
@@ -358,7 +380,7 @@ fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
             }
         }
 
-        let eq_16_term0 = -volume * 4 * stress * dt;
+        let eq_16_term0 = -safe_volume * 4 * stress * dt;
 
         for (var gx = 0; gx < 3; gx++) {
             for (var gy = 0; gy < 3; gy++) {
