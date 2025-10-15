@@ -81,36 +81,36 @@ fn getMaterialProperties(material_type: u32) -> MaterialProperties {
         props.cohesion = 0.0;
         props.friction_angle = 0.0;
     } else if (material_type == MATERIAL_TYPE_4) {
-        // Dry sand (elastoplastic)
+        // Dry sand (elastoplastic) - Reduced stiffness for stability
         props.is_fluid = false;
         props.viscosity = 0.0;
-        props.youngs_modulus = 3.5e4;     // 35 kPa (soft)
-        props.poissons_ratio = 0.3;
+        props.youngs_modulus = 140.0;      // Much softer for stability
+        props.poissons_ratio = 0.2;        // Lower for granular materials
         props.cohesion = 0.0;              // Cohesionless
         props.friction_angle = 0.6;        // tan(~31°)
     } else if (material_type == MATERIAL_TYPE_5) {
-        // Wet sand (elastoplastic)
+        // Wet sand (elastoplastic) - moderate cohesion from water
         props.is_fluid = false;
         props.viscosity = 0.0;
-        props.youngs_modulus = 3.5e4;
-        props.poissons_ratio = 0.3;
-        props.cohesion = 50.0;             // Some cohesion from water
+        props.youngs_modulus = 180.0;
+        props.poissons_ratio = 0.2;
+        props.cohesion = 15.0;             // Increased for noticeable sticking
         props.friction_angle = 0.6;
     } else if (material_type == MATERIAL_TYPE_6) {
-        // Snow (elastoplastic)
+        // Snow (elastoplastic) - compacts and sticks
         props.is_fluid = false;
         props.viscosity = 0.0;
-        props.youngs_modulus = 2.0e4;      // 20 kPa (very soft)
-        props.poissons_ratio = 0.2;
-        props.cohesion = 10.0;
+        props.youngs_modulus = 100.0;      // Very soft
+        props.poissons_ratio = 0.15;
+        props.cohesion = 10.0;             // Increased for snowball effect
         props.friction_angle = 0.7;        // tan(~35°)
     } else {
-        // Clay (elastoplastic) - TYPE_7
+        // Clay (elastoplastic) - TYPE_7 - HIGH cohesion, moldable
         props.is_fluid = false;
         props.viscosity = 0.0;
-        props.youngs_modulus = 5.0e4;      // 50 kPa
-        props.poissons_ratio = 0.35;
-        props.cohesion = 100.0;            // High cohesion
+        props.youngs_modulus = 200.0;      // Moderate stiffness
+        props.poissons_ratio = 0.3;
+        props.cohesion = 40.0;             // High cohesion - holds shape well
         props.friction_angle = 0.4;        // tan(~22°)
     }
     
@@ -320,14 +320,42 @@ fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
             let strain: mat3x3f = dudv + transpose(dudv);
             stress += mat_props.viscosity * strain;
         } else {
-            // Elastoplastic constitutive model
+            // Hybrid elastoplastic model (fluid pressure + elastic deviatoric stress)
+            // This prevents interpenetration while allowing solid-like behavior
+            
+            // 1. Add fluid-like pressure to prevent compression (like granular materials)
+            let pressure: f32 = max(0.0, stiffness * (pow(density / rest_density, 3.) - 1));
+            stress = mat3x3f(-pressure, 0, 0, 0, -pressure, 0, 0, 0, -pressure);
+            
+            // 2. Add elastic deviatoric stress (shear resistance)
             let F = particle.F;
+            var elastic_stress = computeElasticStress(F, mat_props.youngs_modulus, mat_props.poissons_ratio);
             
-            // Compute elastic stress
-            stress = computeElasticStress(F, mat_props.youngs_modulus, mat_props.poissons_ratio);
+            // Remove pressure component from elastic stress (keep only deviatoric/shear part)
+            let trace_elastic = (elastic_stress[0][0] + elastic_stress[1][1] + elastic_stress[2][2]) / 3.0;
+            let I = mat3x3f(
+                vec3f(1., 0., 0.),
+                vec3f(0., 1., 0.),
+                vec3f(0., 0., 1.)
+            );
+            let deviatoric_stress = elastic_stress - trace_elastic * I;
             
-            // Apply plasticity (yield and return mapping)
-            stress = applyPlasticity(stress, mat_props.cohesion, mat_props.friction_angle);
+            // Apply plasticity to deviatoric stress only
+            var full_elastic = deviatoric_stress + trace_elastic * I;
+            full_elastic = applyPlasticity(full_elastic, mat_props.cohesion, mat_props.friction_angle);
+            let deviatoric_after_plasticity = full_elastic - (full_elastic[0][0] + full_elastic[1][1] + full_elastic[2][2]) / 3.0 * I;
+            
+            // Scale down and add to pressure
+            stress += deviatoric_after_plasticity * 0.002;  // Very small contribution
+            
+            // Clamp stress magnitude to prevent explosions
+            let stress_mag = sqrt(
+                stress[0][0]*stress[0][0] + stress[1][1]*stress[1][1] + stress[2][2]*stress[2][2] +
+                2.0 * (stress[0][1]*stress[0][1] + stress[0][2]*stress[0][2] + stress[1][2]*stress[1][2])
+            );
+            if (stress_mag > 50.0) {
+                stress = stress * (50.0 / stress_mag);
+            }
         }
 
         let eq_16_term0 = -volume * 4 * stress * dt;

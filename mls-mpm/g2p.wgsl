@@ -108,7 +108,31 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
             vec3f(0., 0., 1.)
         );
         let grad_v = B * 4.0f;  // Velocity gradient
-        particles[id.x].F = (I + dt * grad_v) * particles[id.x].F;
+        var new_F = (I + dt * grad_v) * particles[id.x].F;
+        
+        // Clamp deformation gradient to prevent instability
+        // Compute determinant to check for extreme deformation
+        let det_F = new_F[0][0] * (new_F[1][1] * new_F[2][2] - new_F[1][2] * new_F[2][1])
+                  - new_F[0][1] * (new_F[1][0] * new_F[2][2] - new_F[1][2] * new_F[2][0])
+                  + new_F[0][2] * (new_F[1][0] * new_F[2][1] - new_F[1][1] * new_F[2][0]);
+        
+        // Reset to identity if deformation is too extreme (prevents explosion)
+        if (det_F < 0.1 || det_F > 10.0) {
+            new_F = I;
+        }
+        
+        // Clamp individual components to prevent extreme values
+        new_F[0][0] = clamp(new_F[0][0], 0.2, 5.0);
+        new_F[1][1] = clamp(new_F[1][1], 0.2, 5.0);
+        new_F[2][2] = clamp(new_F[2][2], 0.2, 5.0);
+        new_F[0][1] = clamp(new_F[0][1], -2.0, 2.0);
+        new_F[0][2] = clamp(new_F[0][2], -2.0, 2.0);
+        new_F[1][0] = clamp(new_F[1][0], -2.0, 2.0);
+        new_F[1][2] = clamp(new_F[1][2], -2.0, 2.0);
+        new_F[2][0] = clamp(new_F[2][0], -2.0, 2.0);
+        new_F[2][1] = clamp(new_F[2][1], -2.0, 2.0);
+        
+        particles[id.x].F = new_F;
         
         particles[id.x].position += particles[id.x].v * dt;
         
@@ -139,6 +163,20 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
             
             // Reconstruct velocity
             particles[id.x].v = v_normal_new + v_tangent_new;
+            
+            // CRITICAL FIX: Reset deformation gradient for elastoplastic materials at wall collision
+            // This prevents stored elastic energy from causing bouncing instability
+            let material_type_local = particles[id.x].material_type;
+            if (material_type_local >= 4u && material_type_local <= 7u) {
+                // Reset F to identity - release all stored elastic deformation
+                particles[id.x].F = mat3x3f(
+                    vec3f(1., 0., 0.),
+                    vec3f(0., 1., 0.),
+                    vec3f(0., 0., 1.)
+                );
+                // Extra velocity damping at wall collision for elastoplastic materials
+                particles[id.x].v *= 0.8;  // Remove 20% of kinetic energy
+            }
         }
 
         // Apply forces based on mode
@@ -165,5 +203,20 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
         
         // Apply damping to gradually reduce velocity (energy dissipation)
         particles[id.x].v *= damping;
+        
+        // Extra damping and deformation relaxation for elastoplastic materials (types 4-7)
+        let material_type = particles[id.x].material_type;
+        if (material_type >= 4u && material_type <= 7u) {
+            particles[id.x].v *= 0.99;  // Additional 1% damping for solids
+            
+            // Gradually relax deformation gradient back toward identity (plastic flow)
+            // This prevents accumulation of elastic energy
+            let I = mat3x3f(
+                vec3f(1., 0., 0.),
+                vec3f(0., 1., 0.),
+                vec3f(0., 0., 1.)
+            );
+            particles[id.x].F = particles[id.x].F * 0.98 + I * 0.02;  // Relax 2% per frame
+        }
     }
 }
