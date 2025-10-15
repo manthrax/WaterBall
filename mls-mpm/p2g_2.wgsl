@@ -3,7 +3,8 @@ struct Particle {
     material_type: u32,
     v: vec3f,
     _padding: u32,
-    C: mat3x3f, 
+    C: mat3x3f,
+    F: mat3x3f,
 }
 struct Cell {
     vx: atomic<i32>, 
@@ -19,22 +20,242 @@ override dynamic_viscosity: f32;
 override dt: f32;
 
 // Material types
-const MATERIAL_TYPE_0: u32 = 0u;
-const MATERIAL_TYPE_1: u32 = 1u;
-const MATERIAL_TYPE_2: u32 = 2u;
-const MATERIAL_TYPE_3: u32 = 3u;
+const MATERIAL_TYPE_0: u32 = 0u;  // Water (fluid)
+const MATERIAL_TYPE_1: u32 = 1u;  // Light syrup (fluid)
+const MATERIAL_TYPE_2: u32 = 2u;  // Syrup (fluid)
+const MATERIAL_TYPE_3: u32 = 3u;  // Honey (fluid)
+const MATERIAL_TYPE_4: u32 = 4u;  // Sand (elastoplastic)
+const MATERIAL_TYPE_5: u32 = 5u;  // Wet sand (elastoplastic)
+const MATERIAL_TYPE_6: u32 = 6u;  // Snow (elastoplastic)
+const MATERIAL_TYPE_7: u32 = 7u;  // Clay (elastoplastic)
+
+struct MaterialProperties {
+    // Elastic properties
+    youngs_modulus: f32,      // E (Pa)
+    poissons_ratio: f32,      // ν (dimensionless)
+    
+    // Plastic properties (Drucker-Prager)
+    cohesion: f32,            // c (Pa) - material strength
+    friction_angle: f32,      // tan(φ) - internal friction
+    
+    // Fluid properties
+    viscosity: f32,           // For fluids
+    
+    // Material class
+    is_fluid: bool,           // true for fluids, false for elastoplastic
+}
+
+fn getMaterialProperties(material_type: u32) -> MaterialProperties {
+    var props: MaterialProperties;
+    
+    if (material_type == MATERIAL_TYPE_0) {
+        // Water (fluid)
+        props.is_fluid = true;
+        props.viscosity = 0.1;
+        props.youngs_modulus = 0.0;
+        props.poissons_ratio = 0.0;
+        props.cohesion = 0.0;
+        props.friction_angle = 0.0;
+    } else if (material_type == MATERIAL_TYPE_1) {
+        // Light syrup (fluid)
+        props.is_fluid = true;
+        props.viscosity = 0.15;
+        props.youngs_modulus = 0.0;
+        props.poissons_ratio = 0.0;
+        props.cohesion = 0.0;
+        props.friction_angle = 0.0;
+    } else if (material_type == MATERIAL_TYPE_2) {
+        // Syrup (fluid)
+        props.is_fluid = true;
+        props.viscosity = 0.25;
+        props.youngs_modulus = 0.0;
+        props.poissons_ratio = 0.0;
+        props.cohesion = 0.0;
+        props.friction_angle = 0.0;
+    } else if (material_type == MATERIAL_TYPE_3) {
+        // Honey (fluid)
+        props.is_fluid = true;
+        props.viscosity = 0.4;
+        props.youngs_modulus = 0.0;
+        props.poissons_ratio = 0.0;
+        props.cohesion = 0.0;
+        props.friction_angle = 0.0;
+    } else if (material_type == MATERIAL_TYPE_4) {
+        // Dry sand (elastoplastic)
+        props.is_fluid = false;
+        props.viscosity = 0.0;
+        props.youngs_modulus = 3.5e4;     // 35 kPa (soft)
+        props.poissons_ratio = 0.3;
+        props.cohesion = 0.0;              // Cohesionless
+        props.friction_angle = 0.6;        // tan(~31°)
+    } else if (material_type == MATERIAL_TYPE_5) {
+        // Wet sand (elastoplastic)
+        props.is_fluid = false;
+        props.viscosity = 0.0;
+        props.youngs_modulus = 3.5e4;
+        props.poissons_ratio = 0.3;
+        props.cohesion = 50.0;             // Some cohesion from water
+        props.friction_angle = 0.6;
+    } else if (material_type == MATERIAL_TYPE_6) {
+        // Snow (elastoplastic)
+        props.is_fluid = false;
+        props.viscosity = 0.0;
+        props.youngs_modulus = 2.0e4;      // 20 kPa (very soft)
+        props.poissons_ratio = 0.2;
+        props.cohesion = 10.0;
+        props.friction_angle = 0.7;        // tan(~35°)
+    } else {
+        // Clay (elastoplastic) - TYPE_7
+        props.is_fluid = false;
+        props.viscosity = 0.0;
+        props.youngs_modulus = 5.0e4;      // 50 kPa
+        props.poissons_ratio = 0.35;
+        props.cohesion = 100.0;            // High cohesion
+        props.friction_angle = 0.4;        // tan(~22°)
+    }
+    
+    return props;
+}
 
 fn getMaterialViscosity(material_type: u32) -> f32 {
-    // Different viscosities per material type
-    if (material_type == MATERIAL_TYPE_0) {
-        return 0.1; // Blue - Water (low viscosity)
-    } else if (material_type == MATERIAL_TYPE_1) {
-        return 0.15; // Red - Light syrup
-    } else if (material_type == MATERIAL_TYPE_2) {
-        return 0.25; // Green - Syrup
-    } else {
-        return 0.4; // Yellow - Honey (high viscosity)
+    let props = getMaterialProperties(material_type);
+    return props.viscosity;
+}
+
+// ============= Matrix operations =============
+fn mat3_determinant(m: mat3x3f) -> f32 {
+    return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+         - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+         + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+}
+
+fn mat3_trace(m: mat3x3f) -> f32 {
+    return m[0][0] + m[1][1] + m[2][2];
+}
+
+fn mat3_transpose(m: mat3x3f) -> mat3x3f {
+    return mat3x3f(
+        vec3f(m[0][0], m[1][0], m[2][0]),
+        vec3f(m[0][1], m[1][1], m[2][1]),
+        vec3f(m[0][2], m[1][2], m[2][2])
+    );
+}
+
+// ============= Elastoplastic constitutive model =============
+
+// Compute Piola-Kirchhoff stress using Neo-Hookean model
+fn computeElasticStress(F: mat3x3f, E: f32, nu: f32) -> mat3x3f {
+    let J = mat3_determinant(F);
+    
+    // Lamé parameters
+    let mu = E / (2.0 * (1.0 + nu));          // Shear modulus
+    let lambda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu));  // First Lamé parameter
+    
+    // Neo-Hookean model: P = μ(F - F^-T) + λlog(J)F^-T
+    // Simplified for small deformations
+    let logJ = log(max(J, 0.01));  // Prevent log(0)
+    
+    // Compute F^T * F
+    let FtF = mat3_transpose(F) * F;
+    
+    // Simplified stress (first Piola-Kirchhoff)
+    // P ≈ μ(F - F^-T) + λlog(J)F^-T
+    // For small strains, approximate as: P ≈ 2μE + λtr(E)I where E = 0.5(F + F^T - 2I)
+    
+    let I = mat3x3f(
+        vec3f(1., 0., 0.),
+        vec3f(0., 1., 0.),
+        vec3f(0., 0., 1.)
+    );
+    
+    // Green strain: E = 0.5(F^T F - I)
+    let strain = 0.5 * (FtF - I);
+    let traceStrain = mat3_trace(strain);
+    
+    // Cauchy stress: σ = λtr(ε)I + 2με
+    let stress = lambda * traceStrain * I + 2.0 * mu * strain;
+    
+    return stress;
+}
+
+// Drucker-Prager yield criterion
+fn druckerPragerYield(stress: mat3x3f, cohesion: f32, friction_angle: f32) -> f32 {
+    // Compute pressure (mean stress)
+    let trace_stress = mat3_trace(stress);
+    let pressure = trace_stress / 3.0;
+    
+    // Compute deviatoric stress
+    let I = mat3x3f(
+        vec3f(1., 0., 0.),
+        vec3f(0., 1., 0.),
+        vec3f(0., 0., 1.)
+    );
+    let deviatoric = stress - pressure * I;
+    
+    // Compute von Mises equivalent stress (J2)
+    // q = sqrt(3/2 * s:s) where s is deviatoric stress
+    let s11 = deviatoric[0][0];
+    let s22 = deviatoric[1][1];
+    let s33 = deviatoric[2][2];
+    let s12 = deviatoric[0][1];
+    let s13 = deviatoric[0][2];
+    let s23 = deviatoric[1][2];
+    
+    let J2 = 0.5 * (s11*s11 + s22*s22 + s33*s33) + s12*s12 + s13*s13 + s23*s23;
+    let q = sqrt(3.0 * J2);
+    
+    // Drucker-Prager yield surface: f = q - α*p - k
+    // where α = friction_angle, k = cohesion
+    let alpha = friction_angle;
+    let k = cohesion;
+    
+    let yield_val = q - alpha * pressure - k;
+    
+    return yield_val;
+}
+
+// Apply plasticity using return mapping
+fn applyPlasticity(stress: mat3x3f, cohesion: f32, friction_angle: f32) -> mat3x3f {
+    let yield_val = druckerPragerYield(stress, cohesion, friction_angle);
+    
+    // If within yield surface, return unchanged
+    if (yield_val <= 0.0) {
+        return stress;
     }
+    
+    // Project back to yield surface
+    let trace_stress = mat3_trace(stress);
+    let pressure = trace_stress / 3.0;
+    
+    let I = mat3x3f(
+        vec3f(1., 0., 0.),
+        vec3f(0., 1., 0.),
+        vec3f(0., 0., 1.)
+    );
+    let deviatoric = stress - pressure * I;
+    
+    // Compute magnitude of deviatoric stress
+    let s11 = deviatoric[0][0];
+    let s22 = deviatoric[1][1];
+    let s33 = deviatoric[2][2];
+    let s12 = deviatoric[0][1];
+    let s13 = deviatoric[0][2];
+    let s23 = deviatoric[1][2];
+    
+    let J2 = 0.5 * (s11*s11 + s22*s22 + s33*s33) + s12*s12 + s13*s13 + s23*s23;
+    let q = sqrt(3.0 * J2);
+    
+    // Scale deviatoric stress to lie on yield surface
+    let target_q = friction_angle * pressure + cohesion;
+    var scale = 1.0;
+    if (q > 0.001) {
+        scale = target_q / q;
+    }
+    
+    let projected_deviatoric = deviatoric * scale;
+    let projected_stress = projected_deviatoric + pressure * I;
+    
+    return projected_stress;
 }
 
 fn encodeFixedPoint(floating_point: f32) -> i32 {
@@ -84,13 +305,30 @@ fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
         let volume: f32 = 1.0 / density; // particle.mass = 1.0;
         densities[id.x] = density;
 
-        let pressure: f32 = max(-0.0, stiffness * (pow(density / rest_density, 5.) - 1));
-
-        var stress: mat3x3f = mat3x3f(-pressure, 0, 0, 0, -pressure, 0, 0, 0, -pressure);
-        let dudv: mat3x3f = particle.C;
-        let strain: mat3x3f = dudv + transpose(dudv);
-        let material_viscosity = getMaterialViscosity(particle.material_type);
-        stress += material_viscosity * strain;
+        // Get material properties
+        let mat_props = getMaterialProperties(particle.material_type);
+        
+        var stress: mat3x3f;
+        
+        if (mat_props.is_fluid) {
+            // Fluid constitutive model (original)
+            let pressure: f32 = max(-0.0, stiffness * (pow(density / rest_density, 5.) - 1));
+            stress = mat3x3f(-pressure, 0, 0, 0, -pressure, 0, 0, 0, -pressure);
+            
+            // Add viscous stress
+            let dudv: mat3x3f = particle.C;
+            let strain: mat3x3f = dudv + transpose(dudv);
+            stress += mat_props.viscosity * strain;
+        } else {
+            // Elastoplastic constitutive model
+            let F = particle.F;
+            
+            // Compute elastic stress
+            stress = computeElasticStress(F, mat_props.youngs_modulus, mat_props.poissons_ratio);
+            
+            // Apply plasticity (yield and return mapping)
+            stress = applyPlasticity(stress, mat_props.cohesion, mat_props.friction_angle);
+        }
 
         let eq_16_term0 = -volume * 4 * stress * dt;
 

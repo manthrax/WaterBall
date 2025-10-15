@@ -72,13 +72,21 @@ fn fs(input: FragmentInput) -> @location(0) vec4f {
     var material_type = textureLoad(material_texture, vec2u(input.iuv), 0).r;
 
     // Material-based coloring (4 types)
-    var diffuseColor = vec3f(0.0, 0.7375, 0.95); // Blue (material 0)
+    var diffuseColor = vec3f(0.0, 0.7375, 0.95); // Blue - Water (material 0)
     if (material_type == 1u) {
-        diffuseColor = vec3f(0.95, 0.2, 0.1); // Red (material 1)
+        diffuseColor = vec3f(0.95, 0.2, 0.1); // Red - Light syrup (material 1)
     } else if (material_type == 2u) {
-        diffuseColor = vec3f(0.2, 0.95, 0.3); // Green (material 2)
+        diffuseColor = vec3f(0.2, 0.95, 0.3); // Green - Syrup (material 2)
     } else if (material_type == 3u) {
-        diffuseColor = vec3f(0.95, 0.85, 0.1); // Yellow (material 3)
+        diffuseColor = vec3f(0.95, 0.85, 0.1); // Yellow - Honey (material 3)
+    } else if (material_type == 4u) {
+        diffuseColor = vec3f(0.9, 0.85, 0.65); // Tan - Dry sand (material 4)
+    } else if (material_type == 5u) {
+        diffuseColor = vec3f(0.7, 0.6, 0.4); // Dark tan - Wet sand (material 5)
+    } else if (material_type == 6u) {
+        diffuseColor = vec3f(0.95, 0.95, 1.0); // White - Snow (material 6)
+    } else if (material_type == 7u) {
+        diffuseColor = vec3f(0.55, 0.45, 0.35); // Brown - Clay (material 7)
     }
     var transmittance: vec3f = exp(-density * thickness * (1.0 - diffuseColor)); 
     var refractionColor: vec3f = bgColor * transmittance;

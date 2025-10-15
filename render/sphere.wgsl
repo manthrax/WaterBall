@@ -146,13 +146,21 @@ fn fs(input: FragmentInput) -> FragmentOutput {
     // Color by material type (4 types)
     var baseColor: vec3f;
     if (input.material_type == 1u) {
-        baseColor = vec3f(0.95, 0.2, 0.1); // Red
+        baseColor = vec3f(0.95, 0.2, 0.1); // Red - Light syrup
     } else if (input.material_type == 2u) {
-        baseColor = vec3f(0.2, 0.95, 0.3); // Green
+        baseColor = vec3f(0.2, 0.95, 0.3); // Green - Syrup
     } else if (input.material_type == 3u) {
-        baseColor = vec3f(0.95, 0.85, 0.1); // Yellow
+        baseColor = vec3f(0.95, 0.85, 0.1); // Yellow - Honey
+    } else if (input.material_type == 4u) {
+        baseColor = vec3f(0.9, 0.85, 0.65); // Tan - Dry sand
+    } else if (input.material_type == 5u) {
+        baseColor = vec3f(0.7, 0.6, 0.4); // Dark tan - Wet sand
+    } else if (input.material_type == 6u) {
+        baseColor = vec3f(0.95, 0.95, 1.0); // White - Snow
+    } else if (input.material_type == 7u) {
+        baseColor = vec3f(0.55, 0.45, 0.35); // Brown - Clay
     } else {
-        baseColor = vec3f(0.0, 0.7375, 0.95); // Blue
+        baseColor = vec3f(0.0, 0.7375, 0.95); // Blue - Water
     }
 
     out.color = vec4(diffuse * baseColor, 1.);

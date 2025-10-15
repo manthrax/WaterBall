@@ -8,7 +8,7 @@ import copyPosition from './copyPosition.wgsl'
 
 import { numParticlesMax, renderUniformsViews } from '../common'
 
-export const mlsmpmParticleStructSize = 80
+export const mlsmpmParticleStructSize = 128  // Updated: added F matrix (48 bytes)
 
 export class MLSMPMSimulator {
     max_x_grids = 80;
@@ -341,9 +341,12 @@ export class MLSMPMSimulator {
                         material_type: new Uint32Array(particlesBuf, offset + 12, 1),
                         v: new Float32Array(particlesBuf, offset + 16, 3),
                         C: new Float32Array(particlesBuf, offset + 32, 12),
+                        F: new Float32Array(particlesBuf, offset + 80, 12),
                     };
                     const jitter = 2.0 * Math.random();
                     particleViews.position.set([i + jitter, j + jitter, k + jitter]);
+                    // Initialize F to identity matrix
+                    particleViews.F.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
                     
                     // Assign material type based on depth (4 layers)
                     const depthRatio = k / (initBoxSize[2] / 2);

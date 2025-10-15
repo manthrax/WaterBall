@@ -3,7 +3,8 @@ struct Particle {
     material_type: u32,
     v: vec3f,
     _padding: u32,
-    C: mat3x3f, 
+    C: mat3x3f,
+    F: mat3x3f,  // Deformation gradient (for elastoplastic materials)
 }
 
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
@@ -30,6 +31,12 @@ fn spawn() {
             let vDir = normalize(center - pos);
             particles[(numParticles - 1) - offset].v = vDir * vScale; // 一定
             particles[(numParticles - 1) - offset].C = mat3x3f(vec3f(0.), vec3f(0.), vec3f(0.));
+            // Initialize deformation gradient to identity
+            particles[(numParticles - 1) - offset].F = mat3x3f(
+                vec3f(1., 0., 0.),
+                vec3f(0., 1., 0.),
+                vec3f(0., 0., 1.)
+            );
         }
     }
 }

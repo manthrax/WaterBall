@@ -3,7 +3,8 @@ struct Particle {
     material_type: u32,
     v: vec3f,
     _padding: u32,
-    C: mat3x3f, 
+    C: mat3x3f,
+    F: mat3x3f,
 }
 struct Cell {
     vx: i32, 
@@ -98,6 +99,17 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
         }
 
         particles[id.x].C = B * 4.0f;
+        
+        // Update deformation gradient for elastoplastic materials
+        // F_new = (I + dt * grad_v) * F_old
+        let I = mat3x3f(
+            vec3f(1., 0., 0.),
+            vec3f(0., 1., 0.),
+            vec3f(0., 0., 1.)
+        );
+        let grad_v = B * 4.0f;  // Velocity gradient
+        particles[id.x].F = (I + dt * grad_v) * particles[id.x].F;
+        
         particles[id.x].position += particles[id.x].v * dt;
         
         // SDF-based boundary constraint
