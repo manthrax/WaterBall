@@ -279,6 +279,14 @@ async function main() {
 		const sphericalConstraintValue = document.getElementById("spherical-constraint-value") as HTMLSpanElement
 		const gravityStrengthSlider = document.getElementById("gravity-strength-slider") as HTMLInputElement
 		const gravityStrengthValue = document.getElementById("gravity-strength-value") as HTMLSpanElement
+		const stiffnessSlider = document.getElementById("stiffness-slider") as HTMLInputElement
+		const stiffnessValue = document.getElementById("stiffness-value") as HTMLSpanElement
+		const cohesionSlider = document.getElementById("cohesion-slider") as HTMLInputElement
+		const cohesionValue = document.getElementById("cohesion-value") as HTMLSpanElement
+		const elasticitySlider = document.getElementById("elasticity-slider") as HTMLInputElement
+		const elasticityValue = document.getElementById("elasticity-value") as HTMLSpanElement
+		const frictionSlider = document.getElementById("friction-slider") as HTMLInputElement
+		const frictionValue = document.getElementById("friction-value") as HTMLSpanElement
 		
 		sphereRenderFl = particle.checked
 		rotateFl = rotate.checked
@@ -313,6 +321,31 @@ async function main() {
 		const gravityStrengthFactor = gravityStrengthPercent / 100
 		mlsmpmSimulator.setGravityStrength(gravityStrengthFactor)
 		gravityStrengthValue.textContent = gravityStrengthPercent.toString()
+		
+		// Material properties
+		// Stiffness: 0-100 slider maps to 0.0-2.0 multiplier
+		const stiffnessPercent = parseInt(stiffnessSlider.value)
+		const stiffnessMultiplier = (stiffnessPercent / 100) * 2.0
+		mlsmpmSimulator.setStiffnessMultiplier(stiffnessMultiplier)
+		stiffnessValue.textContent = stiffnessPercent.toString()
+		
+		// Cohesion: 0-200 slider maps to 0.0-2.0 multiplier
+		const cohesionPercent = parseInt(cohesionSlider.value)
+		const cohesionMultiplier = cohesionPercent / 100
+		mlsmpmSimulator.setCohesionMultiplier(cohesionMultiplier)
+		cohesionValue.textContent = cohesionPercent.toString()
+		
+		// Elasticity: 0-200 slider maps to 0.0-2.0 multiplier
+		const elasticityPercent = parseInt(elasticitySlider.value)
+		const elasticityMultiplier = elasticityPercent / 100
+		mlsmpmSimulator.setElasticityMultiplier(elasticityMultiplier)
+		elasticityValue.textContent = elasticityPercent.toString()
+		
+		// Friction: 0-100 slider maps to 0.0-2.0 multiplier
+		const frictionPercent = parseInt(frictionSlider.value)
+		const frictionMultiplier = (frictionPercent / 100) * 2.0
+		mlsmpmSimulator.setFrictionMultiplier(frictionMultiplier)
+		frictionValue.textContent = frictionPercent.toString()
 		
 		let curBoxWidthRatio = parseInt(slider.value) / 200 + 0.5
 		const minClosingSpeed = -0.01

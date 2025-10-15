@@ -132,6 +132,11 @@ fn getMaterialProperties(material_type: u32) -> MaterialProperties {
         props.friction_angle = 0.8;        // High internal friction
     }
     
+    // Apply user-controlled multipliers
+    props.youngs_modulus *= elasticityMultiplier;
+    props.cohesion *= cohesionMultiplier;
+    props.friction_angle *= frictionMultiplier;
+    
     return props;
 }
 
@@ -288,6 +293,10 @@ fn decodeFixedPoint(fixed_point: i32) -> f32 {
 @group(0) @binding(2) var<uniform> init_box_size: vec3f;
 @group(0) @binding(3) var<uniform> numParticles: u32;
 @group(0) @binding(4) var<storage, read_write> densities: array<f32>;
+@group(0) @binding(5) var<uniform> stiffnessMultiplier: f32;
+@group(0) @binding(6) var<uniform> cohesionMultiplier: f32;
+@group(0) @binding(7) var<uniform> elasticityMultiplier: f32;
+@group(0) @binding(8) var<uniform> frictionMultiplier: f32;
 
 @compute @workgroup_size(64)
 fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -334,7 +343,7 @@ fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
         
         if (mat_props.is_fluid) {
             // Fluid constitutive model (original)
-            let pressure: f32 = max(-0.0, stiffness * (pow(density / rest_density, 5.) - 1));
+            let pressure: f32 = max(-0.0, stiffness * stiffnessMultiplier * (pow(density / rest_density, 5.) - 1));
             stress = mat3x3f(-pressure, 0, 0, 0, -pressure, 0, 0, 0, -pressure);
             
             // Add viscous stress
@@ -346,7 +355,7 @@ fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
             // This prevents interpenetration while allowing solid-like behavior
             
             // 1. Add fluid-like pressure to prevent compression (like granular materials)
-            let pressure: f32 = max(0.0, stiffness * (pow(density / rest_density, 3.) - 1));
+            let pressure: f32 = max(0.0, stiffness * stiffnessMultiplier * (pow(density / rest_density, 3.) - 1));
             stress = mat3x3f(-pressure, 0, 0, 0, -pressure, 0, 0, 0, -pressure);
             
             // 2. Add elastic deviatoric stress (shear resistance)

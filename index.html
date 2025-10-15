@@ -227,29 +227,59 @@
           </optgroup>
         </select>
       </div>
-      <div id="slider-container">
-        <label for="slider">Box width: <span id="slider-value"></span></label>
-        <input type="range" id="slider" min="0" max="100" value="100" />
+      <div style="margin-top: 8px;">
+        <b style="font-size: 11px; margin-bottom: 4px; display: block;">Simulation</b>
+        <div style="display: grid; grid-template-columns: 90px 1fr 30px; gap: 2px 6px; align-items: center; font-size: 10px;">
+          <label for="slider">Box width</label>
+          <input type="range" id="slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="slider-value" style="margin: 0; text-align: right;">100</span>
+          
+          <label for="damping-slider">Damping</label>
+          <input type="range" id="damping-slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="damping-value" style="margin: 0; text-align: right;">100</span>
+          
+          <label for="gravity-strength-slider">Gravity</label>
+          <input type="range" id="gravity-strength-slider" min="0" max="100" value="50" style="width: 100%;" />
+          <span id="gravity-strength-value" style="margin: 0; text-align: right;">50</span>
+          
+          <label for="spherical-constraint-slider">Ball force</label>
+          <input type="range" id="spherical-constraint-slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="spherical-constraint-value" style="margin: 0; text-align: right;">100</span>
+        </div>
       </div>
-      <div id="damping-slider-container">
-        <label for="damping-slider">Damping: <span id="damping-value"></span></label>
-        <input type="range" id="damping-slider" min="0" max="100" value="100" />
+      
+      <div style="margin-top: 8px;">
+        <b style="font-size: 11px; margin-bottom: 4px; display: block;">Boundaries</b>
+        <div style="display: grid; grid-template-columns: 90px 1fr 30px; gap: 2px 6px; align-items: center; font-size: 10px;">
+          <label for="wall-friction-slider">Friction</label>
+          <input type="range" id="wall-friction-slider" min="0" max="100" value="0" style="width: 100%;" />
+          <span id="wall-friction-value" style="margin: 0; text-align: right;">0</span>
+          
+          <label for="wall-restitution-slider">Bounce</label>
+          <input type="range" id="wall-restitution-slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="wall-restitution-value" style="margin: 0; text-align: right;">100</span>
+        </div>
       </div>
-      <div id="wall-friction-slider-container">
-        <label for="wall-friction-slider">Wall friction: <span id="wall-friction-value"></span></label>
-        <input type="range" id="wall-friction-slider" min="0" max="100" value="0" />
-      </div>
-      <div id="wall-restitution-slider-container">
-        <label for="wall-restitution-slider">Wall bounce: <span id="wall-restitution-value"></span></label>
-        <input type="range" id="wall-restitution-slider" min="0" max="100" value="100" />
-      </div>
-      <div id="spherical-constraint-slider-container">
-        <label for="spherical-constraint-slider">Ball force: <span id="spherical-constraint-value"></span></label>
-        <input type="range" id="spherical-constraint-slider" min="0" max="100" value="100" />
-      </div>
-      <div id="gravity-strength-slider-container">
-        <label for="gravity-strength-slider">Gravity: <span id="gravity-strength-value"></span></label>
-        <input type="range" id="gravity-strength-slider" min="0" max="100" value="50" />
+      
+      <div style="margin-top: 8px;">
+        <b style="font-size: 11px; margin-bottom: 4px; display: block;">Material Properties</b>
+        <div style="display: grid; grid-template-columns: 90px 1fr 30px; gap: 2px 6px; align-items: center; font-size: 10px;">
+          <label for="stiffness-slider" title="Pressure repulsion strength">Stiffness</label>
+          <input type="range" id="stiffness-slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="stiffness-value" style="margin: 0; text-align: right;">100</span>
+          
+          <label for="cohesion-slider" title="Particle attraction">Cohesion</label>
+          <input type="range" id="cohesion-slider" min="0" max="200" value="0" style="width: 100%;" />
+          <span id="cohesion-value" style="margin: 0; text-align: right;">0</span>
+          
+          <label for="elasticity-slider" title="Shape memory">Elasticity</label>
+          <input type="range" id="elasticity-slider" min="0" max="200" value="0" style="width: 100%;" />
+          <span id="elasticity-value" style="margin: 0; text-align: right;">0</span>
+          
+          <label for="friction-slider" title="Internal friction">Int. Friction</label>
+          <input type="range" id="friction-slider" min="0" max="100" value="60" style="width: 100%;" />
+          <span id="friction-value" style="margin: 0; text-align: right;">60</span>
+        </div>
       </div>
     </div>
     <div id="number-container">

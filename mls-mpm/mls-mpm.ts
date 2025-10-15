@@ -28,6 +28,10 @@ export class MLSMPMSimulator {
     wallRestitutionBuffer: GPUBuffer
     sphericalConstraintStrengthBuffer: GPUBuffer
     gravityStrengthBuffer: GPUBuffer
+    stiffnessMultiplierBuffer: GPUBuffer
+    cohesionMultiplierBuffer: GPUBuffer
+    elasticityMultiplierBuffer: GPUBuffer
+    frictionMultiplierBuffer: GPUBuffer
     numParticles = 0
     gridCount = 0
     currentSpawnMaterialType = 0
@@ -38,6 +42,10 @@ export class MLSMPMSimulator {
     wallRestitution = 1.0  // Original was perfectly elastic
     sphericalConstraintStrength = 1.0  // Original strength
     gravityStrength = 0.5  // Original gravity
+    stiffnessMultiplier = 1.0  // Material property multipliers
+    cohesionMultiplier = 1.0
+    elasticityMultiplier = 1.0
+    frictionMultiplier = 1.0
 
     clearGridPipeline: GPUComputePipeline
     spawnParticlesPipeline: GPUComputePipeline
@@ -239,6 +247,26 @@ export class MLSMPMSimulator {
             size: 4, // single f32
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
+        this.stiffnessMultiplierBuffer = device.createBuffer({
+            label: 'stiffness multiplier buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.cohesionMultiplierBuffer = device.createBuffer({
+            label: 'cohesion multiplier buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.elasticityMultiplierBuffer = device.createBuffer({
+            label: 'elasticity multiplier buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.frictionMultiplierBuffer = device.createBuffer({
+            label: 'friction multiplier buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
 
         // TODO : これを一か所にまとめる
         const mouseInfoViews = {
@@ -282,7 +310,11 @@ export class MLSMPMSimulator {
                 { binding: 1, resource: { buffer: cellBuffer }}, 
                 { binding: 2, resource: { buffer: this.initBoxSizeBuffer }}, 
                 { binding: 3, resource: { buffer: this.numParticlesBuffer }}, 
-                { binding: 4, resource: { buffer: this.densityBuffer }}
+                { binding: 4, resource: { buffer: this.densityBuffer }},
+                { binding: 5, resource: { buffer: this.stiffnessMultiplierBuffer }},
+                { binding: 6, resource: { buffer: this.cohesionMultiplierBuffer }},
+                { binding: 7, resource: { buffer: this.elasticityMultiplierBuffer }},
+                { binding: 8, resource: { buffer: this.frictionMultiplierBuffer }}
             ]
         })
         this.updateGridBindGroup = device.createBindGroup({
@@ -437,6 +469,16 @@ export class MLSMPMSimulator {
         const gravityStrengthValues = new Float32Array([this.gravityStrength]);
         this.device.queue.writeBuffer(this.gravityStrengthBuffer, 0, gravityStrengthValues);
 
+        // Write material property multipliers
+        const stiffnessMultiplierValues = new Float32Array([this.stiffnessMultiplier]);
+        this.device.queue.writeBuffer(this.stiffnessMultiplierBuffer, 0, stiffnessMultiplierValues);
+        const cohesionMultiplierValues = new Float32Array([this.cohesionMultiplier]);
+        this.device.queue.writeBuffer(this.cohesionMultiplierBuffer, 0, cohesionMultiplierValues);
+        const elasticityMultiplierValues = new Float32Array([this.elasticityMultiplier]);
+        this.device.queue.writeBuffer(this.elasticityMultiplierBuffer, 0, elasticityMultiplierValues);
+        const frictionMultiplierValues = new Float32Array([this.frictionMultiplier]);
+        this.device.queue.writeBuffer(this.frictionMultiplierBuffer, 0, frictionMultiplierValues);
+
         if (!this.spawnPaused && this.frameCount % 2 == 0 && this.numParticles < targetNumParticles) { // TODO : dt に依存しないようにする
             console.log("spawn material type:", this.currentSpawnMaterialType);
             computePass.setBindGroup(0, this.spawnParticlesBindGroup)
@@ -525,5 +567,21 @@ export class MLSMPMSimulator {
 
     setGravityStrength(strength: number) {
         this.gravityStrength = strength;
+    }
+
+    setStiffnessMultiplier(multiplier: number) {
+        this.stiffnessMultiplier = multiplier;
+    }
+
+    setCohesionMultiplier(multiplier: number) {
+        this.cohesionMultiplier = multiplier;
+    }
+
+    setElasticityMultiplier(multiplier: number) {
+        this.elasticityMultiplier = multiplier;
+    }
+
+    setFrictionMultiplier(multiplier: number) {
+        this.frictionMultiplier = multiplier;
     }
 }
