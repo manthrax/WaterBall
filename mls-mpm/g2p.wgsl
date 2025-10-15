@@ -25,6 +25,8 @@ override dt: f32;
 @group(0) @binding(7) var<uniform> damping: f32;
 @group(0) @binding(8) var<uniform> wallFriction: f32;
 @group(0) @binding(9) var<uniform> wallRestitution: f32;
+@group(0) @binding(10) var<uniform> sphericalConstraintStrength: f32;
+@group(0) @binding(11) var<uniform> gravityStrength: f32;
 
 fn decodeFixedPoint(fixed_point: i32) -> f32 {
 	return f32(fixed_point) / fixed_point_multiplier;
@@ -129,22 +131,24 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
 
         // Apply forces based on mode
         if (gravityMode == 1u) {
-            // Gravity mode: simple downward force
-            let gravity = vec3f(0.0, -0.5, 0.0);
+            // Gravity mode: simple downward force (adjustable strength)
+            let gravity = vec3f(0.0, -1.0, 0.0) * gravityStrength;
             particles[id.x].v += gravity * dt;
         } else {
-            // Ball spin mode: radial forces to center
+            // Ball spin mode: radial forces to center (adjustable strength)
             let center = vec3f(real_box_size.x / 2, real_box_size.y / 2, real_box_size.z / 2);
             let dist = center - particles[id.x].position;
             let dirToOrigin = normalize(dist);
             
             let r: f32 = sphereRadius;
             
+            // Sphere boundary repulsion force
             if (dot(dist, dist) < r * r) {
-                particles[id.x].v += -(r - sqrt(dot(dist, dist))) * dirToOrigin * 3.0;
+                particles[id.x].v += -(r - sqrt(dot(dist, dist))) * dirToOrigin * 3.0 * sphericalConstraintStrength;
             }
             
-            particles[id.x].v += dirToOrigin * 0.1;
+            // Gentle pull toward center
+            particles[id.x].v += dirToOrigin * 0.1 * sphericalConstraintStrength;
         }
         
         // Apply damping to gradually reduce velocity (energy dissipation)

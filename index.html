@@ -13,7 +13,8 @@
         justify-content: center;
         align-items: center;
         overscroll-behavior: none; 
-        overflow: hidden; 
+        overflow: hidden;
+        font-family: Arial, Helvetica, sans-serif;
       }
       
       canvas {
@@ -25,43 +26,156 @@
         position: fixed; 
         top: 0; 
         left: 0; 
-        width: 300px; 
-        margin: 20px; 
+        width: 280px; 
+        margin: 15px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      #ui-container label {
+        display: block;
+        margin: 6px 0;
+        color: #333;
+      }
+
+      #ui-container input[type="checkbox"] {
+        margin-right: 6px;
+      }
+
+      #ui-container input[type="radio"] {
+        margin-right: 6px;
+      }
+
+      #ui-container b {
+        color: #222;
+        font-size: 13px;
+      }
+
+      #ui-container > div {
+        margin-top: 12px;
+      }
+
+      /* Slider styling */
+      input[type="range"] {
+        width: 100%;
+        height: 4px;
+        border-radius: 2px;
+        background: #ddd;
+        outline: none;
+        -webkit-appearance: none;
+        margin: 8px 0;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #555;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #555;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      input[type="range"]::-webkit-slider-thumb:hover {
+        background: #333;
+      }
+
+      input[type="range"]::-moz-range-thumb:hover {
+        background: #333;
+      }
+
+      #ui-container span {
+        font-size: 11px;
+        color: #666;
+        margin-left: 6px;
       }
 
       #number-container {
         position: fixed; 
         top: 0; 
         right: 0; 
-        margin: 20px;
-        margin-right: 10px;
-        font-size: 15px;
-        width: 270px;
+        margin: 15px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        font-size: 12px;
+        width: 240px;
+        line-height: 1.4;
+      }
+
+      #number-container label {
+        display: block;
+        margin: 6px 0;
+        color: #333;
+      }
+
+      #number-container b {
+        color: #222;
+        font-size: 13px;
       }
 
       #debug-info {
-        position: fixed; 
+        position: fixed;
+        font-size: 11px;
+        color: #666;
       }
+
       #howto-container {
         position: fixed; 
         bottom: 0; 
         left: 0; 
-        width: 300px; 
-        margin: 20px; 
-        font-size: small;
+        width: 280px; 
+        margin: 15px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        font-size: 11px;
+        color: #555;
+        line-height: 1.5;
       }
+
+      #howto-container b {
+        color: #333;
+      }
+
       #github-link {
-        position:fixed;
+        position: fixed;
         bottom: 0;
         right: 0;
       }
+
       .github-icon {
         position: absolute;
         bottom: 10px;
         right: 20px;
-        font-size: 40px;
-        color: black; 
+        font-size: 32px;
+        color: #333;
+        opacity: 0.7;
+        transition: opacity 0.2s;
       }
+
+      .github-icon:hover {
+        opacity: 1;
+      }
+
       * {
         user-select: none; 
       }
@@ -81,34 +195,38 @@
           <input type="checkbox" id="gravity"> Gravity mode
         </label>
       </div>
-      <div style="margin-top: 15px;">
+      <div>
         <b>Spawn Fluid Type:</b>
-        <form id="material-type-form">
-          <label><input type="radio" name="materialType" value="0" checked> Blue 🔵 (Water - thin)</label><br>
-          <label><input type="radio" name="materialType" value="1"> Red 🔴 (Light syrup)</label><br>
-          <label><input type="radio" name="materialType" value="2"> Green 🟢 (Syrup)</label><br>
-          <label><input type="radio" name="materialType" value="3"> Yellow 🟡 (Honey - thick)</label><br>
+        <form id="material-type-form" style="margin-top: 6px;">
+          <label><input type="radio" name="materialType" value="0" checked> Blue (Water)</label>
+          <label><input type="radio" name="materialType" value="1"> Red (Light syrup)</label>
+          <label><input type="radio" name="materialType" value="2"> Green (Syrup)</label>
+          <label><input type="radio" name="materialType" value="3"> Yellow (Honey)</label>
         </form>
       </div>
-      <div id="slider-container" style="margin-top: 15px;">
-        <label for="slider">Box width:</label>
+      <div id="slider-container">
+        <label for="slider">Box width: <span id="slider-value"></span></label>
         <input type="range" id="slider" min="0" max="100" value="100" />
-        <span id="slider-value"></span>
       </div>
-      <div id="damping-slider-container" style="margin-top: 15px;">
-        <label for="damping-slider">Damping (0 = still, 100 = none):</label>
+      <div id="damping-slider-container">
+        <label for="damping-slider">Damping: <span id="damping-value"></span></label>
         <input type="range" id="damping-slider" min="0" max="100" value="100" />
-        <span id="damping-value"></span>
       </div>
-      <div id="wall-friction-slider-container" style="margin-top: 10px;">
-        <label for="wall-friction-slider">Wall friction (0 = none, 100 = max):</label>
+      <div id="wall-friction-slider-container">
+        <label for="wall-friction-slider">Wall friction: <span id="wall-friction-value"></span></label>
         <input type="range" id="wall-friction-slider" min="0" max="100" value="0" />
-        <span id="wall-friction-value"></span>
       </div>
-      <div id="wall-restitution-slider-container" style="margin-top: 10px;">
-        <label for="wall-restitution-slider">Wall bounce (0 = stick, 100 = elastic):</label>
+      <div id="wall-restitution-slider-container">
+        <label for="wall-restitution-slider">Wall bounce: <span id="wall-restitution-value"></span></label>
         <input type="range" id="wall-restitution-slider" min="0" max="100" value="100" />
-        <span id="wall-restitution-value"></span>
+      </div>
+      <div id="spherical-constraint-slider-container">
+        <label for="spherical-constraint-slider">Ball force: <span id="spherical-constraint-value"></span></label>
+        <input type="range" id="spherical-constraint-slider" min="0" max="100" value="100" />
+      </div>
+      <div id="gravity-strength-slider-container">
+        <label for="gravity-strength-slider">Gravity: <span id="gravity-strength-value"></span></label>
+        <input type="range" id="gravity-strength-slider" min="0" max="100" value="50" />
       </div>
     </div>
     <div id="number-container">

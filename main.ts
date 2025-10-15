@@ -233,6 +233,10 @@ async function main() {
 		const wallFrictionValue = document.getElementById("wall-friction-value") as HTMLSpanElement
 		const wallRestitutionSlider = document.getElementById("wall-restitution-slider") as HTMLInputElement
 		const wallRestitutionValue = document.getElementById("wall-restitution-value") as HTMLSpanElement
+		const sphericalConstraintSlider = document.getElementById("spherical-constraint-slider") as HTMLInputElement
+		const sphericalConstraintValue = document.getElementById("spherical-constraint-value") as HTMLSpanElement
+		const gravityStrengthSlider = document.getElementById("gravity-strength-slider") as HTMLInputElement
+		const gravityStrengthValue = document.getElementById("gravity-strength-value") as HTMLSpanElement
 		
 		sphereRenderFl = particle.checked
 		rotateFl = rotate.checked
@@ -255,6 +259,18 @@ async function main() {
 		const wallRestitutionFactor = 0.5 + (wallRestitutionPercent / 100) * 0.5
 		mlsmpmSimulator.setWallRestitution(wallRestitutionFactor)
 		wallRestitutionValue.textContent = wallRestitutionPercent.toString()
+		
+		// Spherical constraint: 0-100 slider maps to 0.0-1.0 (0 = no force, 100 = full force)
+		const sphericalConstraintPercent = parseInt(sphericalConstraintSlider.value)
+		const sphericalConstraintFactor = sphericalConstraintPercent / 100
+		mlsmpmSimulator.setSphericalConstraintStrength(sphericalConstraintFactor)
+		sphericalConstraintValue.textContent = sphericalConstraintPercent.toString()
+		
+		// Gravity strength: 0-100 slider maps to 0.0-1.0 (0 = no gravity, 100 = strong gravity)
+		const gravityStrengthPercent = parseInt(gravityStrengthSlider.value)
+		const gravityStrengthFactor = gravityStrengthPercent / 100
+		mlsmpmSimulator.setGravityStrength(gravityStrengthFactor)
+		gravityStrengthValue.textContent = gravityStrengthPercent.toString()
 		
 		let curBoxWidthRatio = parseInt(slider.value) / 200 + 0.5
 		const minClosingSpeed = -0.01

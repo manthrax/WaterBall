@@ -26,6 +26,8 @@ export class MLSMPMSimulator {
     dampingBuffer: GPUBuffer
     wallFrictionBuffer: GPUBuffer
     wallRestitutionBuffer: GPUBuffer
+    sphericalConstraintStrengthBuffer: GPUBuffer
+    gravityStrengthBuffer: GPUBuffer
     numParticles = 0
     gridCount = 0
     currentSpawnMaterialType = 0
@@ -33,6 +35,8 @@ export class MLSMPMSimulator {
     damping = 1.0  // Original had no damping
     wallFriction = 0.0  // Original had no friction
     wallRestitution = 1.0  // Original was perfectly elastic
+    sphericalConstraintStrength = 1.0  // Original strength
+    gravityStrength = 0.5  // Original gravity
 
     clearGridPipeline: GPUComputePipeline
     spawnParticlesPipeline: GPUComputePipeline
@@ -224,6 +228,16 @@ export class MLSMPMSimulator {
             size: 4, // single f32
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
+        this.sphericalConstraintStrengthBuffer = device.createBuffer({
+            label: 'spherical constraint strength buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.gravityStrengthBuffer = device.createBuffer({
+            label: 'gravity strength buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
 
         // TODO : これを一か所にまとめる
         const mouseInfoViews = {
@@ -294,6 +308,8 @@ export class MLSMPMSimulator {
                 { binding: 7, resource: { buffer: this.dampingBuffer }},
                 { binding: 8, resource: { buffer: this.wallFrictionBuffer }},
                 { binding: 9, resource: { buffer: this.wallRestitutionBuffer }},
+                { binding: 10, resource: { buffer: this.sphericalConstraintStrengthBuffer }},
+                { binding: 11, resource: { buffer: this.gravityStrengthBuffer }},
             ],
         })
         this.copyPositionBindGroup = device.createBindGroup({
@@ -409,6 +425,14 @@ export class MLSMPMSimulator {
         const wallRestitutionValues = new Float32Array([this.wallRestitution]);
         this.device.queue.writeBuffer(this.wallRestitutionBuffer, 0, wallRestitutionValues);
 
+        // Write spherical constraint strength
+        const sphericalConstraintStrengthValues = new Float32Array([this.sphericalConstraintStrength]);
+        this.device.queue.writeBuffer(this.sphericalConstraintStrengthBuffer, 0, sphericalConstraintStrengthValues);
+
+        // Write gravity strength
+        const gravityStrengthValues = new Float32Array([this.gravityStrength]);
+        this.device.queue.writeBuffer(this.gravityStrengthBuffer, 0, gravityStrengthValues);
+
         if (this.frameCount % 2 == 0 && this.numParticles < targetNumParticles) { // TODO : dt に依存しないようにする
             console.log("spawn material type:", this.currentSpawnMaterialType);
             computePass.setBindGroup(0, this.spawnParticlesBindGroup)
@@ -479,5 +503,13 @@ export class MLSMPMSimulator {
 
     setWallRestitution(restitution: number) {
         this.wallRestitution = restitution;
+    }
+
+    setSphericalConstraintStrength(strength: number) {
+        this.sphericalConstraintStrength = strength;
+    }
+
+    setGravityStrength(strength: number) {
+        this.gravityStrength = strength;
     }
 }
