@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WaterBall</title>
+    <style>
+      body, html {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overscroll-behavior: none; 
+        overflow: hidden;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      
+      canvas {
+        width: 100%;
+        height: 100%;
+      }
+
+      #ui-container {
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        width: 280px; 
+        margin: 15px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      #ui-container label {
+        display: block;
+        margin: 6px 0;
+        color: #333;
+      }
+
+      #ui-container input[type="checkbox"] {
+        margin-right: 6px;
+      }
+
+      #ui-container input[type="radio"] {
+        margin-right: 6px;
+      }
+
+      #ui-container b {
+        color: #222;
+        font-size: 13px;
+      }
+
+      #ui-container > div {
+        margin-top: 12px;
+      }
+
+      /* Slider styling */
+      input[type="range"] {
+        width: 100%;
+        height: 4px;
+        border-radius: 2px;
+        background: #ddd;
+        outline: none;
+        -webkit-appearance: none;
+        margin: 8px 0;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #555;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #555;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      input[type="range"]::-webkit-slider-thumb:hover {
+        background: #333;
+      }
+
+      input[type="range"]::-moz-range-thumb:hover {
+        background: #333;
+      }
+
+      #ui-container span {
+        font-size: 11px;
+        color: #666;
+        margin-left: 6px;
+      }
+
+      #number-container {
+        position: fixed; 
+        top: 0; 
+        right: 0; 
+        margin: 15px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        font-size: 12px;
+        width: 240px;
+        line-height: 1.4;
+      }
+
+      #number-container label {
+        display: block;
+        margin: 6px 0;
+        color: #333;
+      }
+
+      #number-container b {
+        color: #222;
+        font-size: 13px;
+      }
+
+      #debug-info {
+        position: fixed;
+        font-size: 11px;
+        color: #666;
+      }
+
+      #howto-container {
+        position: fixed; 
+        bottom: 0; 
+        left: 0; 
+        width: 280px; 
+        margin: 15px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        font-size: 11px;
+        color: #555;
+        line-height: 1.5;
+      }
+
+      #howto-container b {
+        color: #333;
+      }
+
+      #github-link {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+      }
+
+      .github-icon {
+        position: absolute;
+        bottom: 10px;
+        right: 20px;
+        font-size: 32px;
+        color: #333;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+      }
+
+      .github-icon:hover {
+        opacity: 1;
+      }
+
+      * {
+        user-select: none; 
+      }
+    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script type="module" crossorigin src="/assets/index-YcdvfxMY.js"></script>
+  </head>
+  <body>
+    <div id="ui-container">
+      <div style="display: flex; flex-direction: column;">
+        <label>
+          <input type="checkbox" id="autorotate" checked> Auto rotate
+        </label>
+        <label>
+          <input type="checkbox" id="particle"> Particles
+        </label>
+        <label>
+          <input type="checkbox" id="gravity"> Gravity mode
+        </label>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button id="faucet" style="flex: 1; padding: 10px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; font-family: Arial, sans-serif;">
+          💧 FAUCET (Hold)
+        </button>
+        <button id="clear" style="flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; font-family: Arial, sans-serif;">
+          🗑️ CLEAR
+        </button>
+      </div>
+      <div style="margin-top: 4px; font-size: 10px; color: #666; font-style: italic;">
+        Hold faucet button to spawn particles
+      </div>
+      <div style="margin-top: 8px;">
+        <label for="material-select" style="display: block; margin-bottom: 4px;"><b>Spawn Material:</b></label>
+        <select id="material-select" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd; background: white; font-family: Arial, sans-serif; font-size: 12px; cursor: pointer;">
+          <optgroup label="Fluids">
+            <option value="0" selected>💧 Water (Blue)</option>
+            <option value="1">🍯 Light syrup (Red)</option>
+            <option value="2">🍯 Syrup (Green)</option>
+            <option value="3">🍯 Honey (Yellow)</option>
+          </optgroup>
+          <optgroup label="Granular Materials">
+            <option value="4">🏖️ Dry sand (Tan)</option>
+            <option value="5">🏖️ Wet sand (Brown)</option>
+            <option value="6">❄️ Snow (White)</option>
+            <option value="7">🧱 Clay (Brown)</option>
+          </optgroup>
+          <optgroup label="Elastic Solids">
+            <option value="8">🟣 Jello (Magenta)</option>
+            <option value="9">🪨 Rock (Gray)</option>
+          </optgroup>
+        </select>
+      </div>
+      <div style="margin-top: 8px;">
+        <b style="font-size: 11px; margin-bottom: 4px; display: block;">Simulation</b>
+        <div style="display: grid; grid-template-columns: 90px 1fr 30px; gap: 2px 6px; align-items: center; font-size: 10px;">
+          <label for="slider">Box width</label>
+          <input type="range" id="slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="slider-value" style="margin: 0; text-align: right;">100</span>
+          
+          <label for="damping-slider">Damping</label>
+          <input type="range" id="damping-slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="damping-value" style="margin: 0; text-align: right;">100</span>
+          
+          <label for="gravity-strength-slider">Gravity</label>
+          <input type="range" id="gravity-strength-slider" min="0" max="100" value="50" style="width: 100%;" />
+          <span id="gravity-strength-value" style="margin: 0; text-align: right;">50</span>
+          
+          <label for="spherical-constraint-slider">Ball force</label>
+          <input type="range" id="spherical-constraint-slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="spherical-constraint-value" style="margin: 0; text-align: right;">100</span>
+        </div>
+      </div>
+      
+      <div style="margin-top: 8px;">
+        <b style="font-size: 11px; margin-bottom: 4px; display: block;">Boundaries</b>
+        <div style="display: grid; grid-template-columns: 90px 1fr 30px; gap: 2px 6px; align-items: center; font-size: 10px;">
+          <label for="wall-friction-slider">Friction</label>
+          <input type="range" id="wall-friction-slider" min="0" max="100" value="0" style="width: 100%;" />
+          <span id="wall-friction-value" style="margin: 0; text-align: right;">0</span>
+          
+          <label for="wall-restitution-slider">Bounce</label>
+          <input type="range" id="wall-restitution-slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="wall-restitution-value" style="margin: 0; text-align: right;">100</span>
+        </div>
+      </div>
+      
+      <div style="margin-top: 8px;">
+        <b style="font-size: 11px; margin-bottom: 4px; display: block;">Material Properties</b>
+        <div style="display: grid; grid-template-columns: 90px 1fr 30px; gap: 2px 6px; align-items: center; font-size: 10px;">
+          <label for="stiffness-slider" title="Pressure repulsion strength">Stiffness</label>
+          <input type="range" id="stiffness-slider" min="0" max="100" value="100" style="width: 100%;" />
+          <span id="stiffness-value" style="margin: 0; text-align: right;">100</span>
+          
+          <label for="cohesion-slider" title="Particle attraction">Cohesion</label>
+          <input type="range" id="cohesion-slider" min="0" max="200" value="0" style="width: 100%;" />
+          <span id="cohesion-value" style="margin: 0; text-align: right;">0</span>
+          
+          <label for="elasticity-slider" title="Shape memory">Elasticity</label>
+          <input type="range" id="elasticity-slider" min="0" max="200" value="0" style="width: 100%;" />
+          <span id="elasticity-value" style="margin: 0; text-align: right;">0</span>
+          
+          <label for="friction-slider" title="Internal friction">Int. Friction</label>
+          <input type="range" id="friction-slider" min="0" max="100" value="60" style="width: 100%;" />
+          <span id="friction-value" style="margin: 0; text-align: right;">60</span>
+        </div>
+      </div>
+    </div>
+    <div id="number-container">
+      <b>Number of Particles</b>
+      <form id="number-button">
+        <label><input type="radio" name="options" value="0"> Small (<span id="small-value"></span> particles)</label><br>
+        <label><input type="radio" name="options" value="1" checked> Medium (<span id="medium-value"></span> particles)</label><br>
+        <label><input type="radio" name="options" value="2"> Large (<span id="large-value"></span> particles)</label><br>
+      </form>
+    </div>
+    <div id="howto-container">
+      <div> <b>Drag</b> to move camera </div>
+      <div> <b>Scroll</b> to zoom in and out </div>
+    </div>
+    <div id="debug-info">
+      <span id="error-reason">loading now...(won't take longer than 10 seconds I guess)</span>
+    </div>
+    <a href="https://github.com/matsuoka-601/waterball" 
+      class="github-icon" 
+      target="_blank" 
+      rel="noopener noreferrer">
+        <i class="fab fa-github"></i>
+    </a>
+    <canvas id="fluidCanvas"></canvas>
+  </body>
+</html>
