@@ -1,7 +1,10 @@
 struct Particle {
-    position: vec3f, 
-    v: vec3f, 
-    C: mat3x3f, 
+    position: vec3f,
+    material_type: u32,
+    v: vec3f,
+    _padding: u32,
+    C: mat3x3f,
+    F: mat3x3f,
 }
 struct Cell {
     vx: i32, 
@@ -19,9 +22,33 @@ override dt: f32;
 @group(0) @binding(3) var<uniform> init_box_size: vec3f;
 @group(0) @binding(4) var<uniform> numParticles: u32;
 @group(0) @binding(5) var<uniform> sphereRadius: f32;
+@group(0) @binding(6) var<uniform> gravityMode: u32;
+@group(0) @binding(7) var<uniform> damping: f32;
+@group(0) @binding(8) var<uniform> wallFriction: f32;
+@group(0) @binding(9) var<uniform> wallRestitution: f32;
+@group(0) @binding(10) var<uniform> sphericalConstraintStrength: f32;
+@group(0) @binding(11) var<uniform> gravityStrength: f32;
 
 fn decodeFixedPoint(fixed_point: i32) -> f32 {
 	return f32(fixed_point) / fixed_point_multiplier;
+}
+
+// SDF for axis-aligned box boundary
+// Returns: negative inside, positive outside, 0 on surface
+fn boxSDF(p: vec3f, boxMin: vec3f, boxMax: vec3f) -> f32 {
+    let center = (boxMin + boxMax) * 0.5;
+    let halfSize = (boxMax - boxMin) * 0.5;
+    let q = abs(p - center) - halfSize;
+    return length(max(q, vec3f(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+// Calculate gradient of SDF (surface normal)
+fn boxSDFGradient(p: vec3f, boxMin: vec3f, boxMax: vec3f) -> vec3f {
+    let epsilon = 0.01;
+    let dx = boxSDF(p + vec3f(epsilon, 0.0, 0.0), boxMin, boxMax) - boxSDF(p - vec3f(epsilon, 0.0, 0.0), boxMin, boxMax);
+    let dy = boxSDF(p + vec3f(0.0, epsilon, 0.0), boxMin, boxMax) - boxSDF(p - vec3f(0.0, epsilon, 0.0), boxMin, boxMax);
+    let dz = boxSDF(p + vec3f(0.0, 0.0, epsilon), boxMin, boxMax) - boxSDF(p - vec3f(0.0, 0.0, epsilon), boxMin, boxMax);
+    return normalize(vec3f(dx, dy, dz));
 }
 
 
@@ -72,39 +99,144 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
         }
 
         particles[id.x].C = B * 4.0f;
-        particles[id.x].position += particles[id.x].v * dt;
-        particles[id.x].position = vec3f(
-            clamp(particles[id.x].position.x, 1., real_box_size.x - 2.), 
-            clamp(particles[id.x].position.y, 1., real_box_size.y - 2.), 
-            clamp(particles[id.x].position.z, 1., real_box_size.z - 2.)
+        
+        // Update deformation gradient for elastoplastic materials
+        // F_new = (I + dt * grad_v) * F_old
+        let I = mat3x3f(
+            vec3f(1., 0., 0.),
+            vec3f(0., 1., 0.),
+            vec3f(0., 0., 1.)
         );
-
-        let center = vec3f(real_box_size.x / 2, real_box_size.y / 2, real_box_size.z / 2);
-        let dist = center - particles[id.x].position;
-        let dirToOrigin = normalize(dist);
-        var rForce = vec3f(0);
-
-        // let r: f32 = 18.; // 40,000
-        let r: f32 = sphereRadius; // 60,000
-        // let r: f32 = 26.; // 100,000
-
-        if (dot(dist, dist) < r * r) {
-            particles[id.x].v += -(r - sqrt(dot(dist, dist))) * dirToOrigin * 3.0;
+        let grad_v = B * 4.0f;  // Velocity gradient
+        var new_F = (I + dt * grad_v) * particles[id.x].F;
+        
+        // Clamp deformation gradient to prevent instability
+        // Compute determinant to check for extreme deformation
+        let det_F = new_F[0][0] * (new_F[1][1] * new_F[2][2] - new_F[1][2] * new_F[2][1])
+                  - new_F[0][1] * (new_F[1][0] * new_F[2][2] - new_F[1][2] * new_F[2][0])
+                  + new_F[0][2] * (new_F[1][0] * new_F[2][1] - new_F[1][1] * new_F[2][0]);
+        
+        // Reset to identity if deformation is too extreme (prevents explosion)
+        if (det_F < 0.1 || det_F > 10.0) {
+            new_F = I;
+        }
+        
+        // Clamp individual components to prevent extreme values
+        new_F[0][0] = clamp(new_F[0][0], 0.2, 5.0);
+        new_F[1][1] = clamp(new_F[1][1], 0.2, 5.0);
+        new_F[2][2] = clamp(new_F[2][2], 0.2, 5.0);
+        new_F[0][1] = clamp(new_F[0][1], -2.0, 2.0);
+        new_F[0][2] = clamp(new_F[0][2], -2.0, 2.0);
+        new_F[1][0] = clamp(new_F[1][0], -2.0, 2.0);
+        new_F[1][2] = clamp(new_F[1][2], -2.0, 2.0);
+        new_F[2][0] = clamp(new_F[2][0], -2.0, 2.0);
+        new_F[2][1] = clamp(new_F[2][1], -2.0, 2.0);
+        
+        particles[id.x].F = new_F;
+        
+        particles[id.x].position += particles[id.x].v * dt;
+        
+        // SDF-based boundary constraint
+        let wall_margin = 3.0;
+        let wall_min = vec3f(wall_margin);
+        let wall_max = real_box_size - wall_margin;
+        
+        let sdf_distance = boxSDF(particles[id.x].position, wall_min, wall_max);
+        
+        if (sdf_distance > 0.0) {
+            // Particle is outside boundary - project back to surface
+            let normal = boxSDFGradient(particles[id.x].position, wall_min, wall_max);
+            
+            // Hard constraint: move particle back inside
+            particles[id.x].position -= normal * sdf_distance;
+            
+            // Decompose velocity into normal and tangential components
+            let v_dot_n = dot(particles[id.x].v, normal);
+            let v_normal = normal * v_dot_n;
+            let v_tangent = particles[id.x].v - v_normal;
+            
+            // Apply restitution to normal component (bounce)
+            let v_normal_new = v_normal * -wallRestitution;
+            
+            // Apply friction to tangential component (slide)
+            let v_tangent_new = v_tangent * (1.0 - wallFriction);
+            
+            // Reconstruct velocity
+            particles[id.x].v = v_normal_new + v_tangent_new;
+            
+            // CRITICAL FIX: Reset deformation gradient for solid materials at wall collision
+            // This prevents stored elastic energy from causing bouncing instability
+            let material_type_local = particles[id.x].material_type;
+            if (material_type_local >= 4u && material_type_local <= 9u) {
+                // For granular materials (4-7): reset F completely
+                // For elastic solids (8-9): partial reset to allow some bounce
+                if (material_type_local >= 8u) {
+                    // Jello/Rock: keep some elastic deformation for bounce
+                    let I = mat3x3f(
+                        vec3f(1., 0., 0.),
+                        vec3f(0., 1., 0.),
+                        vec3f(0., 0., 1.)
+                    );
+                    particles[id.x].F = particles[id.x].F * 0.5 + I * 0.5;  // 50% reset
+                    particles[id.x].v *= 0.9;  // Less damping for elastic bounce
+                } else {
+                    // Granular materials: full reset
+                    particles[id.x].F = mat3x3f(
+                        vec3f(1., 0., 0.),
+                        vec3f(0., 1., 0.),
+                        vec3f(0., 0., 1.)
+                    );
+                    particles[id.x].v *= 0.8;  // More damping for granular
+                }
+            }
         }
 
-        particles[id.x].v += dirToOrigin * 0.1;
-
+        // Apply forces based on mode
+        if (gravityMode == 1u) {
+            // Gravity mode: simple downward force (adjustable strength)
+            let gravity = vec3f(0.0, -1.0, 0.0) * gravityStrength;
+            particles[id.x].v += gravity * dt;
+        } else {
+            // Ball spin mode: radial forces to center (adjustable strength)
+            let center = vec3f(real_box_size.x / 2, real_box_size.y / 2, real_box_size.z / 2);
+            let dist = center - particles[id.x].position;
+            let dirToOrigin = normalize(dist);
+            
+            let r: f32 = sphereRadius;
+            
+            // Sphere boundary repulsion force
+            if (dot(dist, dist) < r * r) {
+                particles[id.x].v += -(r - sqrt(dot(dist, dist))) * dirToOrigin * 3.0 * sphericalConstraintStrength;
+            }
+            
+            // Gentle pull toward center
+            particles[id.x].v += dirToOrigin * 0.1 * sphericalConstraintStrength;
+        }
         
-        let k = 3.0;
-        let wall_stiffness = 1.0;
-        let x_n: vec3f = particles[id.x].position + particles[id.x].v * dt * k;
-        let wall_min: vec3f = vec3f(3.);
-        let wall_max: vec3f = real_box_size - 4.;
-        if (x_n.x < wall_min.x) { particles[id.x].v.x += wall_stiffness * (wall_min.x - x_n.x); }
-        if (x_n.x > wall_max.x) { particles[id.x].v.x += wall_stiffness * (wall_max.x - x_n.x); }
-        if (x_n.y < wall_min.y) { particles[id.x].v.y += wall_stiffness * (wall_min.y - x_n.y); }
-        if (x_n.y > wall_max.y) { particles[id.x].v.y += wall_stiffness * (wall_max.y - x_n.y); }
-        if (x_n.z < wall_min.z) { particles[id.x].v.z += wall_stiffness * (wall_min.z - x_n.z); }
-        if (x_n.z > wall_max.z) { particles[id.x].v.z += wall_stiffness * (wall_max.z - x_n.z); }
+        // Apply damping to gradually reduce velocity (energy dissipation)
+        particles[id.x].v *= damping;
+        
+        // Extra damping and deformation relaxation for solid materials (types 4-9)
+        let material_type = particles[id.x].material_type;
+        if (material_type >= 4u && material_type <= 9u) {
+            particles[id.x].v *= 0.99;  // Additional 1% damping for solids
+            
+            // Gradually relax deformation gradient back toward identity (plastic flow)
+            // This prevents accumulation of elastic energy
+            let I = mat3x3f(
+                vec3f(1., 0., 0.),
+                vec3f(0., 1., 0.),
+                vec3f(0., 0., 1.)
+            );
+            
+            // Different relaxation rates for different materials
+            var relaxation = 0.02;  // Default 2% relaxation per frame
+            if (material_type == 8u || material_type == 9u) {
+                // Jello and Rock are more elastic - slower relaxation
+                relaxation = 0.005;  // 0.5% relaxation - keeps elastic energy longer
+            }
+            
+            particles[id.x].F = particles[id.x].F * (1.0 - relaxation) + I * relaxation;
+        }
     }
 }

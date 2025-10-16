@@ -65,7 +65,7 @@ async function main() {
 			numberButtonPressed = true
 			numberButtonPressedButton = target.value
 		}
-	}); 
+	});
 	const smallValue = document.getElementById("small-value") as HTMLSpanElement;
 	const mediumValue = document.getElementById("medium-value") as HTMLSpanElement;
 	const largeValue = document.getElementById("large-value") as HTMLSpanElement;
@@ -171,6 +171,57 @@ async function main() {
 
 	console.log("simulator initialization done")
 
+	// Material type selection - must be after mlsmpmSimulator is created
+	let materialSelect = document.getElementById('material-select') as HTMLSelectElement;
+	materialSelect.addEventListener('change', function() {
+		const materialType = parseInt(materialSelect.value);
+		mlsmpmSimulator.setSpawnMaterialType(materialType);
+		console.log("Changed spawn material type to:", materialType);
+	});
+
+	// Faucet button - hold to spawn particles
+	let faucetButton = document.getElementById('faucet') as HTMLButtonElement;
+	faucetButton.addEventListener('mousedown', () => {
+		mlsmpmSimulator.setSpawnPaused(false);
+		faucetButton.style.background = '#2ecc71'; // Green when active
+		faucetButton.textContent = '💧 SPAWNING...';
+	});
+	faucetButton.addEventListener('mouseup', () => {
+		mlsmpmSimulator.setSpawnPaused(true);
+		faucetButton.style.background = '#4a90e2'; // Back to blue
+		faucetButton.textContent = '💧 FAUCET (Hold)';
+	});
+	faucetButton.addEventListener('mouseleave', () => {
+		mlsmpmSimulator.setSpawnPaused(true);
+		faucetButton.style.background = '#4a90e2'; // Back to blue
+		faucetButton.textContent = '💧 FAUCET (Hold)';
+	});
+	// Also handle touch events for mobile
+	faucetButton.addEventListener('touchstart', (e) => {
+		e.preventDefault();
+		mlsmpmSimulator.setSpawnPaused(false);
+		faucetButton.style.background = '#2ecc71';
+		faucetButton.textContent = '💧 SPAWNING...';
+	});
+	faucetButton.addEventListener('touchend', (e) => {
+		e.preventDefault();
+		mlsmpmSimulator.setSpawnPaused(true);
+		faucetButton.style.background = '#4a90e2';
+		faucetButton.textContent = '💧 FAUCET (Hold)';
+	});
+
+	// Clear button - reset simulation
+	let clearButton = document.getElementById('clear') as HTMLButtonElement;
+	clearButton.addEventListener('click', () => {
+		mlsmpmSimulator.clearParticles();
+		console.log("Cleared all particles");
+		// Flash the button
+		clearButton.style.background = '#c0392b';
+		setTimeout(() => {
+			clearButton.style.background = '#e74c3c';
+		}, 100);
+	});
+
 	const camera = new Camera(canvasElement);
 
 	// デバイスロストの監視
@@ -215,8 +266,87 @@ async function main() {
 		const slider = document.getElementById("slider") as HTMLInputElement
 		const particle = document.getElementById("particle") as HTMLInputElement
 		const rotate = document.getElementById("autorotate") as HTMLInputElement
+		const gravity = document.getElementById("gravity") as HTMLInputElement
+		const faucetButton = document.getElementById("faucet") as HTMLButtonElement
+		const clearButton = document.getElementById("clear") as HTMLButtonElement
+		const dampingSlider = document.getElementById("damping-slider") as HTMLInputElement
+		const dampingValue = document.getElementById("damping-value") as HTMLSpanElement
+		const wallFrictionSlider = document.getElementById("wall-friction-slider") as HTMLInputElement
+		const wallFrictionValue = document.getElementById("wall-friction-value") as HTMLSpanElement
+		const wallRestitutionSlider = document.getElementById("wall-restitution-slider") as HTMLInputElement
+		const wallRestitutionValue = document.getElementById("wall-restitution-value") as HTMLSpanElement
+		const sphericalConstraintSlider = document.getElementById("spherical-constraint-slider") as HTMLInputElement
+		const sphericalConstraintValue = document.getElementById("spherical-constraint-value") as HTMLSpanElement
+		const gravityStrengthSlider = document.getElementById("gravity-strength-slider") as HTMLInputElement
+		const gravityStrengthValue = document.getElementById("gravity-strength-value") as HTMLSpanElement
+		const stiffnessSlider = document.getElementById("stiffness-slider") as HTMLInputElement
+		const stiffnessValue = document.getElementById("stiffness-value") as HTMLSpanElement
+		const cohesionSlider = document.getElementById("cohesion-slider") as HTMLInputElement
+		const cohesionValue = document.getElementById("cohesion-value") as HTMLSpanElement
+		const elasticitySlider = document.getElementById("elasticity-slider") as HTMLInputElement
+		const elasticityValue = document.getElementById("elasticity-value") as HTMLSpanElement
+		const frictionSlider = document.getElementById("friction-slider") as HTMLInputElement
+		const frictionValue = document.getElementById("friction-value") as HTMLSpanElement
+		
 		sphereRenderFl = particle.checked
 		rotateFl = rotate.checked
+		mlsmpmSimulator.setGravityMode(gravity.checked)
+		
+		// Damping: 0-100 slider maps to 0.95-1.0 (0 = max damping, 100 = no damping)
+		const dampingPercent = parseInt(dampingSlider.value)
+		const dampingFactor = 0.95 + (dampingPercent / 100) * 0.05
+		mlsmpmSimulator.setDamping(dampingFactor)
+		dampingValue.textContent = dampingPercent.toString()
+		
+		// Wall friction: 0-100 slider maps to 0.0-0.5 (0 = no friction, 100 = high friction)
+		const wallFrictionPercent = parseInt(wallFrictionSlider.value)
+		const wallFrictionFactor = (wallFrictionPercent / 100) * 0.5
+		mlsmpmSimulator.setWallFriction(wallFrictionFactor)
+		wallFrictionValue.textContent = wallFrictionPercent.toString()
+		
+		// Wall restitution: 0-100 slider maps to 0.5-1.0 (0 = inelastic/stick, 100 = elastic/bounce)
+		const wallRestitutionPercent = parseInt(wallRestitutionSlider.value)
+		const wallRestitutionFactor = 0.5 + (wallRestitutionPercent / 100) * 0.5
+		mlsmpmSimulator.setWallRestitution(wallRestitutionFactor)
+		wallRestitutionValue.textContent = wallRestitutionPercent.toString()
+		
+		// Spherical constraint: 0-100 slider maps to 0.0-1.0 (0 = no force, 100 = full force)
+		const sphericalConstraintPercent = parseInt(sphericalConstraintSlider.value)
+		const sphericalConstraintFactor = sphericalConstraintPercent / 100
+		mlsmpmSimulator.setSphericalConstraintStrength(sphericalConstraintFactor)
+		sphericalConstraintValue.textContent = sphericalConstraintPercent.toString()
+		
+		// Gravity strength: 0-100 slider maps to 0.0-1.0 (0 = no gravity, 100 = strong gravity)
+		const gravityStrengthPercent = parseInt(gravityStrengthSlider.value)
+		const gravityStrengthFactor = gravityStrengthPercent / 100
+		mlsmpmSimulator.setGravityStrength(gravityStrengthFactor)
+		gravityStrengthValue.textContent = gravityStrengthPercent.toString()
+		
+		// Material properties
+		// Stiffness: 0-100 slider maps to 0.0-2.0 multiplier
+		const stiffnessPercent = parseInt(stiffnessSlider.value)
+		const stiffnessMultiplier = (stiffnessPercent / 100) * 2.0
+		mlsmpmSimulator.setStiffnessMultiplier(stiffnessMultiplier)
+		stiffnessValue.textContent = stiffnessPercent.toString()
+		
+		// Cohesion: 0-200 slider maps to 0.0-2.0 multiplier
+		const cohesionPercent = parseInt(cohesionSlider.value)
+		const cohesionMultiplier = cohesionPercent / 100
+		mlsmpmSimulator.setCohesionMultiplier(cohesionMultiplier)
+		cohesionValue.textContent = cohesionPercent.toString()
+		
+		// Elasticity: 0-200 slider maps to 0.0-2.0 multiplier
+		const elasticityPercent = parseInt(elasticitySlider.value)
+		const elasticityMultiplier = elasticityPercent / 100
+		mlsmpmSimulator.setElasticityMultiplier(elasticityMultiplier)
+		elasticityValue.textContent = elasticityPercent.toString()
+		
+		// Friction: 0-100 slider maps to 0.0-2.0 multiplier
+		const frictionPercent = parseInt(frictionSlider.value)
+		const frictionMultiplier = (frictionPercent / 100) * 2.0
+		mlsmpmSimulator.setFrictionMultiplier(frictionMultiplier)
+		frictionValue.textContent = frictionPercent.toString()
+		
 		let curBoxWidthRatio = parseInt(slider.value) / 200 + 0.5
 		const minClosingSpeed = -0.01
 		const maxOpeningSpeed = 0.04
@@ -224,9 +354,14 @@ async function main() {
 		dVal = Math.min(dVal, maxOpeningSpeed);
 		boxWidthRatio += dVal
 
-		// 行列の更新
+		// Update box size
 		realBoxSize[2] = initBoxSize[2] * boxWidthRatio
 		mlsmpmSimulator.changeBoxSize(realBoxSize)
+		
+		// Update camera target to keep box centered in view
+		camera.target = [realBoxSize[0] / 2, realBoxSize[1] / 2, realBoxSize[2] / 2];
+		camera.recalculateView();
+		
 		device.queue.writeBuffer(renderUniformBuffer, 0, renderUniformsValues) 
 
 		const commandEncoder = device.createCommandEncoder()

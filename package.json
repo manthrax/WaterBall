@@ -1,8 +1,9 @@
 {
     "type": "module",
     "scripts": {
-        "build": "npx vite build", 
-        "serve": "npx vite"
+        "dev": "vite",
+        "build": "vite build", 
+        "serve": "vite preview"
     },
     "devDependencies": {
         "@webgpu/types": "^0.1.51",

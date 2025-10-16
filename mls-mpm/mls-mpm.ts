@@ -8,7 +8,7 @@ import copyPosition from './copyPosition.wgsl'
 
 import { numParticlesMax, renderUniformsViews } from '../common'
 
-export const mlsmpmParticleStructSize = 80
+export const mlsmpmParticleStructSize = 128  // Updated: added F matrix (48 bytes)
 
 export class MLSMPMSimulator {
     max_x_grids = 80;
@@ -21,8 +21,31 @@ export class MLSMPMSimulator {
     densityBuffer: GPUBuffer
     mouseInfoUniformBuffer: GPUBuffer
     sphereRadiusBuffer: GPUBuffer
+    spawnMaterialTypeBuffer: GPUBuffer
+    gravityModeBuffer: GPUBuffer
+    dampingBuffer: GPUBuffer
+    wallFrictionBuffer: GPUBuffer
+    wallRestitutionBuffer: GPUBuffer
+    sphericalConstraintStrengthBuffer: GPUBuffer
+    gravityStrengthBuffer: GPUBuffer
+    stiffnessMultiplierBuffer: GPUBuffer
+    cohesionMultiplierBuffer: GPUBuffer
+    elasticityMultiplierBuffer: GPUBuffer
+    frictionMultiplierBuffer: GPUBuffer
     numParticles = 0
     gridCount = 0
+    currentSpawnMaterialType = 0
+    spawnPaused = true  // Start paused - user must hold faucet button
+    gravityMode = false
+    damping = 1.0  // Original had no damping
+    wallFriction = 0.0  // Original had no friction
+    wallRestitution = 1.0  // Original was perfectly elastic
+    sphericalConstraintStrength = 1.0  // Original strength
+    gravityStrength = 0.5  // Original gravity
+    stiffnessMultiplier = 1.0  // Material property multipliers
+    cohesionMultiplier = 1.0
+    elasticityMultiplier = 1.0
+    frictionMultiplier = 1.0
 
     clearGridPipeline: GPUComputePipeline
     spawnParticlesPipeline: GPUComputePipeline
@@ -189,6 +212,61 @@ export class MLSMPMSimulator {
             size: 4, // single f32
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
+        this.spawnMaterialTypeBuffer = device.createBuffer({
+            label: 'spawn material type buffer', 
+            size: 4, // single u32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.gravityModeBuffer = device.createBuffer({
+            label: 'gravity mode buffer', 
+            size: 4, // single u32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.dampingBuffer = device.createBuffer({
+            label: 'damping buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.wallFrictionBuffer = device.createBuffer({
+            label: 'wall friction buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.wallRestitutionBuffer = device.createBuffer({
+            label: 'wall restitution buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.sphericalConstraintStrengthBuffer = device.createBuffer({
+            label: 'spherical constraint strength buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.gravityStrengthBuffer = device.createBuffer({
+            label: 'gravity strength buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.stiffnessMultiplierBuffer = device.createBuffer({
+            label: 'stiffness multiplier buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.cohesionMultiplierBuffer = device.createBuffer({
+            label: 'cohesion multiplier buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.elasticityMultiplierBuffer = device.createBuffer({
+            label: 'elasticity multiplier buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+        this.frictionMultiplierBuffer = device.createBuffer({
+            label: 'friction multiplier buffer', 
+            size: 4, // single f32
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
 
         // TODO : これを一か所にまとめる
         const mouseInfoViews = {
@@ -212,7 +290,8 @@ export class MLSMPMSimulator {
             entries: [
               { binding: 0, resource: { buffer: particleBuffer }}, 
               { binding: 1, resource: { buffer: this.initBoxSizeBuffer }}, 
-              { binding: 2, resource: { buffer: this.numParticlesBuffer }}
+              { binding: 2, resource: { buffer: this.numParticlesBuffer }},
+              { binding: 3, resource: { buffer: this.spawnMaterialTypeBuffer }}
             ],  
         })
         this.p2g1BindGroup = device.createBindGroup({
@@ -231,7 +310,11 @@ export class MLSMPMSimulator {
                 { binding: 1, resource: { buffer: cellBuffer }}, 
                 { binding: 2, resource: { buffer: this.initBoxSizeBuffer }}, 
                 { binding: 3, resource: { buffer: this.numParticlesBuffer }}, 
-                { binding: 4, resource: { buffer: this.densityBuffer }}
+                { binding: 4, resource: { buffer: this.densityBuffer }},
+                { binding: 5, resource: { buffer: this.stiffnessMultiplierBuffer }},
+                { binding: 6, resource: { buffer: this.cohesionMultiplierBuffer }},
+                { binding: 7, resource: { buffer: this.elasticityMultiplierBuffer }},
+                { binding: 8, resource: { buffer: this.frictionMultiplierBuffer }}
             ]
         })
         this.updateGridBindGroup = device.createBindGroup({
@@ -253,7 +336,13 @@ export class MLSMPMSimulator {
                 { binding: 2, resource: { buffer: this.realBoxSizeBuffer }},
                 { binding: 3, resource: { buffer: this.initBoxSizeBuffer }},
                 { binding: 4, resource: { buffer: this.numParticlesBuffer }}, 
-                { binding: 5, resource: { buffer: this.sphereRadiusBuffer }}, 
+                { binding: 5, resource: { buffer: this.sphereRadiusBuffer }},
+                { binding: 6, resource: { buffer: this.gravityModeBuffer }},
+                { binding: 7, resource: { buffer: this.dampingBuffer }},
+                { binding: 8, resource: { buffer: this.wallFrictionBuffer }},
+                { binding: 9, resource: { buffer: this.wallRestitutionBuffer }},
+                { binding: 10, resource: { buffer: this.sphericalConstraintStrengthBuffer }},
+                { binding: 11, resource: { buffer: this.gravityStrengthBuffer }},
             ],
         })
         this.copyPositionBindGroup = device.createBindGroup({
@@ -275,17 +364,36 @@ export class MLSMPMSimulator {
 
         this.numParticles = 0;
         
+        // Initialize with 4 different material types in vertical layers
         for (let j = 3; j < initBoxSize[1] * 0.80 && this.numParticles < numParticles; j += spacing) {
             for (let i = 3; i < initBoxSize[0] - 4 && this.numParticles < numParticles; i += spacing) {
                 for (let k = 3; k < initBoxSize[2] / 2 && this.numParticles < numParticles; k += spacing) {
                     const offset = mlsmpmParticleStructSize * this.numParticles;
                     const particleViews = {
                         position: new Float32Array(particlesBuf, offset + 0, 3),
+                        material_type: new Uint32Array(particlesBuf, offset + 12, 1),
                         v: new Float32Array(particlesBuf, offset + 16, 3),
                         C: new Float32Array(particlesBuf, offset + 32, 12),
+                        F: new Float32Array(particlesBuf, offset + 80, 12),
                     };
                     const jitter = 2.0 * Math.random();
                     particleViews.position.set([i + jitter, j + jitter, k + jitter]);
+                    // Initialize F to identity matrix
+                    particleViews.F.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
+                    
+                    // Assign material type based on depth (4 layers)
+                    const depthRatio = k / (initBoxSize[2] / 2);
+                    let materialType = 0;
+                    if (depthRatio < 0.25) {
+                        materialType = 0; // Blue - front layer
+                    } else if (depthRatio < 0.5) {
+                        materialType = 1; // Red
+                    } else if (depthRatio < 0.75) {
+                        materialType = 2; // Green
+                    } else {
+                        materialType = 3; // Yellow - back layer
+                    }
+                    particleViews.material_type.set([materialType]);
                     this.numParticles++;
                 }
             }
@@ -333,8 +441,46 @@ export class MLSMPMSimulator {
         canvasInfoViews.mouseRadius.set([mouseRadius])
         this.device.queue.writeBuffer(this.mouseInfoUniformBuffer, 0, this.mouseInfoValues);
 
-        if (this.frameCount % 2 == 0 && this.numParticles < targetNumParticles) { // TODO : dt に依存しないようにする
-            console.log("spawn");
+        // Write current spawn material type
+        const spawnMaterialTypeValues = new Uint32Array([this.currentSpawnMaterialType]);
+        this.device.queue.writeBuffer(this.spawnMaterialTypeBuffer, 0, spawnMaterialTypeValues);
+
+        // Write gravity mode
+        const gravityModeValues = new Uint32Array([this.gravityMode ? 1 : 0]);
+        this.device.queue.writeBuffer(this.gravityModeBuffer, 0, gravityModeValues);
+
+        // Write damping
+        const dampingValues = new Float32Array([this.damping]);
+        this.device.queue.writeBuffer(this.dampingBuffer, 0, dampingValues);
+
+        // Write wall friction
+        const wallFrictionValues = new Float32Array([this.wallFriction]);
+        this.device.queue.writeBuffer(this.wallFrictionBuffer, 0, wallFrictionValues);
+
+        // Write wall restitution
+        const wallRestitutionValues = new Float32Array([this.wallRestitution]);
+        this.device.queue.writeBuffer(this.wallRestitutionBuffer, 0, wallRestitutionValues);
+
+        // Write spherical constraint strength
+        const sphericalConstraintStrengthValues = new Float32Array([this.sphericalConstraintStrength]);
+        this.device.queue.writeBuffer(this.sphericalConstraintStrengthBuffer, 0, sphericalConstraintStrengthValues);
+
+        // Write gravity strength
+        const gravityStrengthValues = new Float32Array([this.gravityStrength]);
+        this.device.queue.writeBuffer(this.gravityStrengthBuffer, 0, gravityStrengthValues);
+
+        // Write material property multipliers
+        const stiffnessMultiplierValues = new Float32Array([this.stiffnessMultiplier]);
+        this.device.queue.writeBuffer(this.stiffnessMultiplierBuffer, 0, stiffnessMultiplierValues);
+        const cohesionMultiplierValues = new Float32Array([this.cohesionMultiplier]);
+        this.device.queue.writeBuffer(this.cohesionMultiplierBuffer, 0, cohesionMultiplierValues);
+        const elasticityMultiplierValues = new Float32Array([this.elasticityMultiplier]);
+        this.device.queue.writeBuffer(this.elasticityMultiplierBuffer, 0, elasticityMultiplierValues);
+        const frictionMultiplierValues = new Float32Array([this.frictionMultiplier]);
+        this.device.queue.writeBuffer(this.frictionMultiplierBuffer, 0, frictionMultiplierValues);
+
+        if (!this.spawnPaused && this.frameCount % 2 == 0 && this.numParticles < targetNumParticles) { // TODO : dt に依存しないようにする
+            console.log("spawn material type:", this.currentSpawnMaterialType);
             computePass.setBindGroup(0, this.spawnParticlesBindGroup)
             computePass.setPipeline(this.spawnParticlesPipeline)
             computePass.dispatchWorkgroups(1)
@@ -383,5 +529,59 @@ export class MLSMPMSimulator {
         numParticlesViews.set([numParticles])
         this.device.queue.writeBuffer(this.numParticlesBuffer, 0, numParticlesViews)
         this.numParticles = numParticles
+    }
+
+    setSpawnMaterialType(materialType: number) {
+        this.currentSpawnMaterialType = materialType;
+    }
+
+    setSpawnPaused(paused: boolean) {
+        this.spawnPaused = paused;
+    }
+
+    clearParticles() {
+        this.changeNumParticles(0);
+        this.frameCount = 0;
+        this.spawned = false;
+    }
+
+    setGravityMode(enabled: boolean) {
+        this.gravityMode = enabled;
+    }
+
+    setDamping(damping: number) {
+        this.damping = damping;
+    }
+
+    setWallFriction(friction: number) {
+        this.wallFriction = friction;
+    }
+
+    setWallRestitution(restitution: number) {
+        this.wallRestitution = restitution;
+    }
+
+    setSphericalConstraintStrength(strength: number) {
+        this.sphericalConstraintStrength = strength;
+    }
+
+    setGravityStrength(strength: number) {
+        this.gravityStrength = strength;
+    }
+
+    setStiffnessMultiplier(multiplier: number) {
+        this.stiffnessMultiplier = multiplier;
+    }
+
+    setCohesionMultiplier(multiplier: number) {
+        this.cohesionMultiplier = multiplier;
+    }
+
+    setElasticityMultiplier(multiplier: number) {
+        this.elasticityMultiplier = multiplier;
+    }
+
+    setFrictionMultiplier(multiplier: number) {
+        this.frictionMultiplier = multiplier;
     }
 }

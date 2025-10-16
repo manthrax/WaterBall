@@ -1,16 +1,19 @@
 struct VertexOutput {
     @builtin(position) position: vec4f, 
     @location(0) uv: vec2f, 
-    @location(1) view_position: vec3f, 
+    @location(1) view_position: vec3f,
+    @location(2) @interpolate(flat) material_type: u32,
 }
 
 struct FragmentInput {
     @location(0) uv: vec2f, 
-    @location(1) view_position: vec3f, 
+    @location(1) view_position: vec3f,
+    @location(2) @interpolate(flat) material_type: u32,
 }
 
 struct FragmentOutput {
-    @location(0) frag_color: vec4f, 
+    @location(0) frag_color: vec4f,
+    @location(1) material: vec4u,
     @builtin(frag_depth) frag_depth: f32, 
 }
 
@@ -24,7 +27,8 @@ struct RenderUniforms {
 }
 
 struct PosVel {
-    position: vec3f, 
+    position: vec3f,
+    material_type: u32,
     v: vec3f, 
     density: f32, 
 }
@@ -87,7 +91,8 @@ fn vs(
 
     let out_position = uniforms.projection_matrix * vec4f(view_position + corner, 1.0);
 
-    return VertexOutput(out_position, uv, view_position);
+    let material_type = particles[instance_index].material_type;
+    return VertexOutput(out_position, uv, view_position, material_type);
 }
 
 @fragment
@@ -108,5 +113,6 @@ fn fs(input: FragmentInput) -> FragmentOutput {
     out.frag_depth = clip_space_pos.z / clip_space_pos.w;
 
     out.frag_color = vec4(real_view_pos.z, 0., 0., 1.);
+    out.material = vec4u(input.material_type, 0u, 0u, 1u);
     return out;
 }
